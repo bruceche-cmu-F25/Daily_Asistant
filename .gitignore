@@ -1,0 +1,25 @@
+# macOS and editor metadata
+.DS_Store
+.idea/
+.vscode/
+
+# Python caches and test output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+ENVIRONMENT_AND_API_KEYS.md
+
+# Generated dashboard and runtime artifacts
+today.html
+event-plists/
+*.log
+*.err
+*.out
+*.tmp
