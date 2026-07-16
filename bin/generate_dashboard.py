@@ -214,9 +214,12 @@ def tech_news():
 
 
 def discover_event_source(url):
-    host = urllib.parse.urlparse(url).netloc.lower()
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.netloc.lower()
     if 'luma.com' in host:
         return 'Luma'
+    if host.endswith('cmu.edu') and ('/sv/' in parsed.path.lower() or host.startswith('sv.')):
+        return 'CMU-SV'
     if host.endswith('cmu.edu'):
         return 'CMU'
     if 'anthropic.com' in host:
@@ -234,24 +237,32 @@ def discover_event_source(url):
     return 'Community'
 
 
+def discover_event_is_bay_area(text):
+    """Require an explicit Bay Area location instead of guessing from the source."""
+    locations = (
+        'bay area', 'silicon valley', 'san francisco', 'south bay', 'peninsula',
+        'mountain view', 'sunnyvale', 'santa clara', 'san jose', 'san josé',
+        'palo alto', 'redwood city', 'menlo park', 'cupertino', 'moffett field',
+        'san mateo', 'foster city', 'fremont', 'oakland', 'berkeley',
+    )
+    return any(location in text for location in locations) or bool(re.search(r'\bSF\b', text, re.IGNORECASE))
+
+
 def discover_event_is_relevant(item, source):
-    text = html.unescape(f"{item.get('title', '')} {item.get('snippet', '')}").lower()
+    title = html.unescape(item.get('title', ''))
+    text = f"{title} {html.unescape(item.get('snippet', ''))}".lower()
+    link = item.get('link', '').lower()
     if any(term in text for term in ('applications are now closed', 'event has ended', 'past event', 'watch sessions')):
+        return False
+    if any(term in text for term in ('pittsburgh', 'pgh')):
         return False
     if source == 'CMU' and any(term in text for term in ('calendar search', 'calendar feed')):
         return False
-    if source == 'Luma' and not any(
-        term in text for term in ('pittsburgh', 'pgh', 'carnegie', 'cmu', 'online', 'virtual', 'around the world')
-    ):
-        return False
-    if source == 'Community' and not any(
-        term in text for term in ('pittsburgh', 'pgh', 'carnegie', 'cmu', 'online', 'virtual')
-    ):
+    if not discover_event_is_bay_area(text):
         return False
     company_sources = {'Anthropic', 'Microsoft', 'Google', 'AWS', 'NVIDIA', 'Apple'}
-    if source in company_sources and not any(
-        term in text for term in (TODAY.strftime('%B').lower(), 'online', 'virtual', 'livestream', 'pittsburgh', 'pgh')
-    ):
+    event_signals = ('event', 'meetup', 'summit', 'conference', 'workshop', 'webinar', 'hackathon', 'session', 'developer day', 'gtc')
+    if source in company_sources and not any(signal in title.lower() or signal in link for signal in event_signals):
         return False
     years = [int(year) for year in re.findall(r'\b(20\d{2})\b', text)]
     if years and max(years) < TODAY.year:
@@ -263,6 +274,17 @@ def discover_event_is_relevant(item, source):
             start=1,
         )
     }
+    if 'week of' not in title.lower():
+        dated_title = re.search(
+            r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:,\s*(20\d{2}))?',
+            title,
+            re.IGNORECASE,
+        )
+        if dated_title:
+            month_name, day, year = dated_title.groups()
+            event_date = dt.date(int(year or TODAY.year), month_names[month_name.lower()], int(day))
+            if event_date < TODAY:
+                return False
     for month_name, year in re.findall(
         r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\b[^\n]{0,20}\b(20\d{2})\b',
         text,
@@ -274,11 +296,12 @@ def discover_event_is_relevant(item, source):
 
 
 def discover_events():
-    """Find event candidates; the UI keeps these read-only and links to the source."""
+    """Find Bay Area event candidates; the UI is read-only and links to sources."""
     queries = [
-        f'Pittsburgh AI developer startup events Luma {TODAY.strftime("%B %Y")}',
-        f'site:events.cmu.edu OR site:cs.cmu.edu/calendar AI computer science {TODAY.strftime("%B %Y")}',
-        f'site:anthropic.com/events OR site:developer.microsoft.com/reactor OR site:developer.apple.com/events developer AI {TODAY.strftime("%B %Y")}',
+        f'San Francisco Bay Area Silicon Valley AI developer startup events Luma {TODAY.strftime("%B %Y")}',
+        f'site:events.cmu.edu/sv OR site:sv.cmu.edu events career AI Silicon Valley {TODAY.strftime("%B %Y")}',
+        f'site:anthropic.com/events OR site:developer.microsoft.com/reactor OR site:developer.apple.com/events "San Francisco" developer AI {TODAY.strftime("%B %Y")}',
+        f'site:developers.google.com OR site:nvidia.com events "Silicon Valley" OR "San Jose" OR "San Francisco" {TODAY.strftime("%B %Y")}',
     ]
     seen, found = set(), []
     for query in queries:

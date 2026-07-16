@@ -16,7 +16,7 @@ vi.mock("./api", () => ({
     links: { study: [], jobs: [] },
     weekly: [{ text: "Ship it", key: "notion:one", checked: false, is_todo: true }],
     notion: [], jobs: [], news: [{ title: "AI ships", link: "https://example.com/news", snippet: "A useful signal." }],
-    discover_events: [{ title: "Pittsburgh AI Builders", link: "https://luma.com/example", snippet: "Meet local AI builders.", source: "Luma" }],
+    discover_events: [{ title: "Silicon Valley AI Builders", link: "https://luma.com/example", snippet: "Meet local AI builders in Mountain View.", source: "Luma" }],
     job_groups: {},
     quick_actions: [{ title: "Gmail", subtitle: "Inbox / 邮件", url: "https://mail.google.com/mail/u/0/#inbox", kind: "hot" }],
     quiet_links: [{ title: "LinkedIn", url: "https://www.linkedin.com/in/chi-cheng921/", kind: "profile", label: "Profile" }],
@@ -78,8 +78,9 @@ describe("App", () => {
   it("renders the read-only activity radar and news feed", async () => {
     render(<MemoryRouter initialEntries={["/discover"]}><App /></MemoryRouter>);
     expect(await screen.findByRole("heading", { name: "Events / 活动雷达" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Pittsburgh AI Builders/ })).toHaveAttribute("href", "https://luma.com/example");
-    expect(screen.getByRole("link", { name: /Pittsburgh Tech on Luma/ })).toHaveAttribute("href", "https://luma.com/PGHTech");
+    expect(screen.getByRole("link", { name: /Silicon Valley AI Builders/ })).toHaveAttribute("href", "https://luma.com/example");
+    expect(screen.getByRole("link", { name: /Bay Area AI on Luma/ })).toHaveAttribute("href", "https://luma.com/discover/sf/ai");
+    expect(screen.getByRole("link", { name: /CMU Silicon Valley/ })).toHaveAttribute("href", "https://events.cmu.edu/sv/");
     expect(screen.getByRole("link", { name: /AI ships/ })).toHaveAttribute("href", "https://example.com/news");
     expect(screen.getByText(/只读发现/)).toBeInTheDocument();
   });

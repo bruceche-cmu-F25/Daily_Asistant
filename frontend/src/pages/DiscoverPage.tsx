@@ -6,9 +6,10 @@ type Props = { dashboard: DashboardSnapshot };
 type Filter = "all" | "local" | "company";
 
 const officialSources = [
-  { mark: "LU", name: "Pittsburgh Tech on Luma", note: "Local AI, startup and builder events", url: "https://luma.com/PGHTech", kind: "local" },
-  { mark: "CM", name: "CMU Events", note: "University-wide public calendar", url: "https://events.cmu.edu/", kind: "campus" },
-  { mark: "CS", name: "CMU SCS Calendar", note: "Talks, seminars and research events", url: "https://www.cs.cmu.edu/calendar", kind: "campus" },
+  { mark: "LU", name: "Bay Area AI on Luma", note: "San Francisco AI and builder events", url: "https://luma.com/discover/sf/ai", kind: "local" },
+  { mark: "SV", name: "Silicon Valley Startups", note: "Founder, startup and investor events", url: "https://luma.com/sve", kind: "local" },
+  { mark: "CM", name: "CMU Silicon Valley", note: "Official Silicon Valley campus calendar", url: "https://events.cmu.edu/sv/", kind: "campus" },
+  { mark: "CS", name: "CMU-SV Career Events", note: "Workshops, employer events and networking", url: "https://www.sv.cmu.edu/current-students/career-services/workshops-and-events.html", kind: "campus" },
   { mark: "G", name: "Google Developers", note: "GDG, DevFest and Build with AI", url: "https://developers.google.com/community", kind: "company" },
   { mark: "MS", name: "Microsoft Reactor", note: "Live developer events and training", url: "https://developer.microsoft.com/en-us/reactor/", kind: "company" },
   { mark: "A", name: "Anthropic Events", note: "Claude webinars and builder events", url: "https://www.anthropic.com/events", kind: "company" },
@@ -16,9 +17,17 @@ const officialSources = [
   { mark: "NV", name: "NVIDIA Workshops", note: "AI and accelerated computing training", url: "https://www.nvidia.com/en-us/training/instructor-led-workshops/", kind: "company" },
 ];
 
-const localSources = new Set(["Luma", "CMU", "Community"]);
+const localSources = new Set(["Luma", "CMU-SV", "CMU", "Community"]);
+
+const bayAreaPattern = /bay area|silicon valley|san francisco|\bsf\b|south bay|peninsula|mountain view|sunnyvale|santa clara|san jos[eé]|palo alto|redwood city|menlo park|cupertino|moffett field|san mateo|foster city|fremont|oakland|berkeley/i;
+
+function isBayAreaEvent(event: DiscoverEvent) {
+  const text = `${event.title} ${event.snippet}`;
+  return !/pittsburgh|\bpgh\b/i.test(text) && bayAreaPattern.test(text);
+}
 
 function eventMatches(event: DiscoverEvent, filter: Filter, query: string) {
+  if (!isBayAreaEvent(event)) return false;
   if (filter === "local" && !localSources.has(event.source)) return false;
   if (filter === "company" && localSources.has(event.source)) return false;
   const normalized = query.trim().toLowerCase();
@@ -28,7 +37,7 @@ function eventMatches(event: DiscoverEvent, filter: Filter, query: string) {
 export function DiscoverPage({ dashboard }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  const discoveredEvents = dashboard.discover_events ?? [];
+  const discoveredEvents = (dashboard.discover_events ?? []).filter(isBayAreaEvent);
   const candidates = useMemo(
     () => discoveredEvents.filter((event) => eventMatches(event, filter, query)),
     [discoveredEvents, filter, query],
@@ -40,7 +49,7 @@ export function DiscoverPage({ dashboard }: Props) {
         <div>
           <p className="eyebrow">DISCOVER / READ-ONLY RADAR</p>
           <h1>Events / 活动雷达</h1>
-          <p>把 Luma、CMU 和大厂官方活动入口放在一起。先看本地和线上候选，再决定是否报名。</p>
+          <p>只看 CMU Silicon Valley 周边和湾区活动。覆盖 South Bay、半岛与旧金山，再决定是否报名。</p>
           <span className="discover-readonly">只读发现 · 不自动报名 · 不向外部平台回写</span>
         </div>
         <div className="discover-stats" aria-label="Discover summary">
@@ -73,7 +82,7 @@ export function DiscoverPage({ dashboard }: Props) {
         </div>
         <div className="event-filters" role="group" aria-label="Event source filter">
           {(["all", "local", "company"] as Filter[]).map((item) => (
-            <button key={item} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{item === "all" ? "ALL" : item === "local" ? "PITTSBURGH + CMU" : "BIG TECH + ONLINE"}</button>
+            <button key={item} type="button" aria-pressed={filter === item} onClick={() => setFilter(item)}>{item === "all" ? "ALL BAY AREA" : item === "local" ? "SILICON VALLEY + CMU" : "BIG TECH + BAY AREA"}</button>
           ))}
         </div>
         <p className="candidate-note">自动搜索只负责发现候选；时间、地点和报名状态以打开后的官方页面为准。</p>

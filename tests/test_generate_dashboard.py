@@ -161,16 +161,16 @@ class DashboardTests(unittest.TestCase):
 
     def test_discover_events_tags_sources_and_deduplicates_links(self):
         results = [
-            {'title': 'AI Builders', 'link': 'https://luma.com/ai-builders', 'snippet': 'Pittsburgh'},
+            {'title': 'AI Builders', 'link': 'https://luma.com/ai-builders', 'snippet': 'Mountain View, Silicon Valley'},
             {'title': 'Duplicate', 'link': 'https://luma.com/ai-builders', 'snippet': 'Same event'},
-            {'title': 'CMU Seminar', 'link': 'https://events.cmu.edu/event/seminar', 'snippet': 'Campus'},
-            {'title': 'Claude Webinar', 'link': 'https://www.anthropic.com/events/webinar', 'snippet': 'Virtual'},
+            {'title': 'CMU-SV Seminar', 'link': 'https://events.cmu.edu/sv/event/seminar', 'snippet': 'Moffett Field'},
+            {'title': 'Claude Builder Night', 'link': 'https://www.anthropic.com/events/builder', 'snippet': 'San Francisco'},
         ]
 
         with mock.patch.object(dashboard, 'brave', return_value=results):
             events = dashboard.discover_events()
 
-        self.assertEqual([event['source'] for event in events], ['Luma', 'CMU', 'Anthropic'])
+        self.assertEqual([event['source'] for event in events], ['Luma', 'CMU-SV', 'Anthropic'])
         self.assertEqual(len(events), 3)
         self.assertTrue(all(event['link'].startswith('https://') for event in events))
         self.assertFalse(dashboard.discover_event_is_relevant(
@@ -178,8 +178,21 @@ class DashboardTests(unittest.TestCase):
             'Community',
         ))
         self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'Pittsburgh AI Builders', 'snippet': 'Carnegie Mellon main campus'},
+            'CMU',
+        ))
+        self.assertFalse(dashboard.discover_event_is_relevant(
             {'title': 'Google Cloud Next 2025', 'snippet': 'Watch the sessions'},
             'Anthropic',
+        ))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'NVIDIA AI Software News', 'snippet': 'Announced at GTC San Jose', 'link': 'https://nvidia.com/blog/news'},
+            'NVIDIA',
+        ))
+        past_date = dashboard.TODAY - dashboard.dt.timedelta(days=1)
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': f'AI Night — San Francisco, {past_date.strftime("%B %-d, %Y")}', 'snippet': 'A startup event', 'link': 'https://example.com/event'},
+            'Community',
         ))
 
     def test_subprocess_failure_is_visible_in_status(self):
