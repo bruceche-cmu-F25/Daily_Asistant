@@ -43,6 +43,7 @@ def load_dashboard_snapshot(path: Path = DASHBOARD_SNAPSHOT_PATH) -> dict[str, A
             "notion": [],
             "jobs": [],
             "news": [],
+            "discover_events": [],
             "job_groups": {},
             "quick_actions": [],
             "quiet_links": [],

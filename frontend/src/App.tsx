@@ -30,6 +30,7 @@ const emptyDashboard: DashboardSnapshot = {
   notion: [],
   jobs: [],
   news: [],
+  discover_events: [],
   job_groups: {},
   quick_actions: [],
   quiet_links: [],
@@ -177,7 +178,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage dashboard={dashboard} />} />
         <Route path="/neetcode" element={<NeetCodePage snapshot={snapshot} onRefresh={refreshSnapshot} />} />
-        <Route path="/discover" element={<DiscoverPage />} />
+        <Route path="/discover" element={<DiscoverPage dashboard={dashboard} />} />
       </Routes>
       {location.pathname !== "/" && <footer>LOCAL-FIRST / PARALLEL PREVIEW / PORT 8766</footer>}
     </div>

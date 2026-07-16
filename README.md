@@ -18,7 +18,7 @@ cd frontend && npm install && npm run build && cd ..
 http://127.0.0.1:8766/
 ```
 
-新版当前包含 `/`、`/neetcode`、`/discover` 三条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt 和本地 Todo 状态 API。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
+新版当前包含 `/`、`/neetcode`、`/discover` 三条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt 和本地 Todo 状态 API。`/discover` 是只读活动雷达：每天从 Brave 搜索 Luma、CMU 和大厂活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
 
 无损创建 v2 数据库并导入旧版刷题记录：
 

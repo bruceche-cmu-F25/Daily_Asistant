@@ -100,12 +100,7 @@ export function HomePage({ dashboard }: Props) {
             <ol className="legacy-feed">{dashboard.jobs.length ? dashboard.jobs.map((job) => <li key={job.link}><a href={job.link} target="_blank" rel="noopener noreferrer">{job.title}</a><p>{job.snippet}</p></li>) : <li>No job results from Brave today.</li>}</ol>
           </section>
 
-          <section className="legacy-content-section" id="news" data-index="04 / SIGNAL">
-            <p className="legacy-section-tag">Industry signal</p><h2>Tech News / 科技圈速览</h2><p className="legacy-sub">Short scan only. 看标题即可，除非和 AI / jobs / full-stack 直接相关。</p>
-            <ol className="legacy-feed news">{dashboard.news.length ? dashboard.news.map((news) => <li key={news.link}><a href={news.link} target="_blank" rel="noopener noreferrer">{news.title}</a><p>{news.snippet}</p></li>) : <li>No Brave results.</li>}</ol>
-          </section>
-
-          <section className="legacy-content-section" id="links" data-index="05 / ARCHIVE">
+          <section className="legacy-content-section" id="links" data-index="04 / ARCHIVE">
             <p className="legacy-section-tag">Utility archive</p><h2>Lower Priority / 低优先级链接</h2><p className="legacy-sub">需要时再打开。Jobs · Study · Infra · Billing · Ideas · Profile · Research。</p>
             <div className="legacy-quiet-grid">{quietLinks.map((item) => <a className={`legacy-quiet-card ${item.kind} brand-${identity(item.url).brand}`} href={item.url} key={item.url} target="_blank" rel="noopener noreferrer"><LinkIcon url={item.url} /><em>{item.label}</em><b>{item.title}</b><span>{item.url}</span></a>)}</div>
           </section>

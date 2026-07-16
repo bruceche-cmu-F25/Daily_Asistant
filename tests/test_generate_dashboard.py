@@ -159,6 +159,29 @@ class DashboardTests(unittest.TestCase):
         )
         self.assertTrue(dashboard.SOURCE_STATUS['Brave Search']['ok'])
 
+    def test_discover_events_tags_sources_and_deduplicates_links(self):
+        results = [
+            {'title': 'AI Builders', 'link': 'https://luma.com/ai-builders', 'snippet': 'Pittsburgh'},
+            {'title': 'Duplicate', 'link': 'https://luma.com/ai-builders', 'snippet': 'Same event'},
+            {'title': 'CMU Seminar', 'link': 'https://events.cmu.edu/event/seminar', 'snippet': 'Campus'},
+            {'title': 'Claude Webinar', 'link': 'https://www.anthropic.com/events/webinar', 'snippet': 'Virtual'},
+        ]
+
+        with mock.patch.object(dashboard, 'brave', return_value=results):
+            events = dashboard.discover_events()
+
+        self.assertEqual([event['source'] for event in events], ['Luma', 'CMU', 'Anthropic'])
+        self.assertEqual(len(events), 3)
+        self.assertTrue(all(event['link'].startswith('https://') for event in events))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'AI Events in New York City', 'snippet': 'In-person NYC event'},
+            'Community',
+        ))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'Google Cloud Next 2025', 'snippet': 'Watch the sessions'},
+            'Anthropic',
+        ))
+
     def test_subprocess_failure_is_visible_in_status(self):
         with mock.patch.object(
             dashboard.subprocess,

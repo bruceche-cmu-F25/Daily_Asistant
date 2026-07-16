@@ -82,7 +82,7 @@ def write_dashboard_snapshot(payload):
     fallback_fields = {
         'Calendar': ('events',),
         'Notion': ('links', 'weekly', 'notion', 'weekly_plan'),
-        'Brave Search': ('jobs', 'news'),
+        'Brave Search': ('jobs', 'news', 'discover_events'),
     }
     for source, fields in fallback_fields.items():
         if SOURCE_STATUS.get(source, {}).get('ok'):
@@ -211,6 +211,90 @@ def brave(query, n=6, freshness='pd', timeout=45):
 
 def tech_news():
     return brave('biggest technology news today AI software chips big tech startups', 5, 'pd')
+
+
+def discover_event_source(url):
+    host = urllib.parse.urlparse(url).netloc.lower()
+    if 'luma.com' in host:
+        return 'Luma'
+    if host.endswith('cmu.edu'):
+        return 'CMU'
+    if 'anthropic.com' in host:
+        return 'Anthropic'
+    if 'microsoft.com' in host:
+        return 'Microsoft'
+    if 'google.com' in host:
+        return 'Google'
+    if 'amazon.com' in host or 'aws.' in host:
+        return 'AWS'
+    if 'nvidia.com' in host:
+        return 'NVIDIA'
+    if 'apple.com' in host:
+        return 'Apple'
+    return 'Community'
+
+
+def discover_event_is_relevant(item, source):
+    text = html.unescape(f"{item.get('title', '')} {item.get('snippet', '')}").lower()
+    if any(term in text for term in ('applications are now closed', 'event has ended', 'past event', 'watch sessions')):
+        return False
+    if source == 'CMU' and any(term in text for term in ('calendar search', 'calendar feed')):
+        return False
+    if source == 'Luma' and not any(
+        term in text for term in ('pittsburgh', 'pgh', 'carnegie', 'cmu', 'online', 'virtual', 'around the world')
+    ):
+        return False
+    if source == 'Community' and not any(
+        term in text for term in ('pittsburgh', 'pgh', 'carnegie', 'cmu', 'online', 'virtual')
+    ):
+        return False
+    company_sources = {'Anthropic', 'Microsoft', 'Google', 'AWS', 'NVIDIA', 'Apple'}
+    if source in company_sources and not any(
+        term in text for term in (TODAY.strftime('%B').lower(), 'online', 'virtual', 'livestream', 'pittsburgh', 'pgh')
+    ):
+        return False
+    years = [int(year) for year in re.findall(r'\b(20\d{2})\b', text)]
+    if years and max(years) < TODAY.year:
+        return False
+    month_names = {
+        name.lower(): index for index, name in enumerate(
+            ('January', 'February', 'March', 'April', 'May', 'June',
+             'July', 'August', 'September', 'October', 'November', 'December'),
+            start=1,
+        )
+    }
+    for month_name, year in re.findall(
+        r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\b[^\n]{0,20}\b(20\d{2})\b',
+        text,
+    ):
+        event_month = dt.date(int(year), month_names[month_name], 1)
+        if event_month < TODAY.replace(day=1):
+            return False
+    return True
+
+
+def discover_events():
+    """Find event candidates; the UI keeps these read-only and links to the source."""
+    queries = [
+        f'Pittsburgh AI developer startup events Luma {TODAY.strftime("%B %Y")}',
+        f'site:events.cmu.edu OR site:cs.cmu.edu/calendar AI computer science {TODAY.strftime("%B %Y")}',
+        f'site:anthropic.com/events OR site:developer.microsoft.com/reactor OR site:developer.apple.com/events developer AI {TODAY.strftime("%B %Y")}',
+    ]
+    seen, found = set(), []
+    for query in queries:
+        for item in brave(query, 5, 'pm', timeout=35):
+            link = item.get('link', '').strip()
+            title = item.get('title', '').strip()
+            if not link.startswith('https://') or not title or link in seen:
+                continue
+            source = discover_event_source(link)
+            if not discover_event_is_relevant(item, source):
+                continue
+            seen.add(link)
+            found.append({**item, 'source': source})
+            if len(found) >= 12:
+                return found
+    return found
 
 
 def job_posts():
@@ -653,7 +737,8 @@ def event_action_html(event):
     return visual_anchor('btn', event.get('url'), 'Open / 开始做')
 
 
-def render(events, news, jobs, links, weekly, notion):
+def render(events, news, jobs, links, weekly, notion, discovered_events=None):
+    discovered_events = discovered_events or []
     theme_css = (ASSET_DIR / 'dashboard-retro.css').read_text(encoding='utf-8')
     theme_js = (ASSET_DIR / 'dashboard-retro.js').read_text(encoding='utf-8')
     task_count = sum(1 for item in weekly + notion if item.get('is_todo'))
@@ -762,6 +847,7 @@ def render(events, news, jobs, links, weekly, notion):
         'notion': notion,
         'jobs': jobs,
         'news': news,
+        'discover_events': discovered_events,
         'job_groups': job_groups,
         'quick_actions': [
             {'title': title, 'subtitle': subtitle, 'url': url, 'kind': kind}
@@ -865,7 +951,8 @@ def main(open_page=True, schedule_reminders=True):
     notion = high_level_notion_digest()
     jobs = job_posts()
     news = tech_news()
-    render(events, news, jobs, links, weekly, notion)
+    discovered_events = discover_events()
+    render(events, news, jobs, links, weekly, notion, discovered_events)
     if schedule_reminders:
         schedule_events(events)
     if open_page:

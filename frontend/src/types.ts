@@ -75,6 +75,7 @@ export type DashboardEvent = {
   all_day: boolean;
 };
 export type FeedItem = { title: string; link: string; snippet: string };
+export type DiscoverEvent = FeedItem & { source: string };
 export type QuickAction = { title: string; subtitle: string; url: string; kind: string };
 export type QuietLink = { title: string; url: string; kind: string; label: string };
 export type DashboardSnapshot = {
@@ -90,6 +91,7 @@ export type DashboardSnapshot = {
   notion: DigestItem[];
   jobs: FeedItem[];
   news: FeedItem[];
+  discover_events?: DiscoverEvent[];
   job_groups: Record<string, DashboardLink[]>;
   quick_actions: QuickAction[];
   quiet_links: QuietLink[];
