@@ -39,7 +39,29 @@ def dashboard() -> dict:
 
 @app.get("/todo-favicon.svg", include_in_schema=False)
 def favicon():
-    return FileResponse(FRONTEND_DIST / "todo-favicon.svg", media_type="image/svg+xml")
+    return FileResponse(
+        FRONTEND_DIST / "todo-favicon.svg",
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/todo-favicon.png", include_in_schema=False)
+def favicon_png():
+    return FileResponse(
+        FRONTEND_DIST / "todo-favicon.png",
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico():
+    return FileResponse(
+        FRONTEND_DIST / "favicon.ico",
+        media_type="image/x-icon",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/{path:path}", include_in_schema=False)
