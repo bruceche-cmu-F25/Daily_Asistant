@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { loadDashboard, loadNeetCode } from "./api";
+import { BrandGlyph, brandIdentity } from "./components/BrandLogo";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
 import { NeetCodePage } from "./pages/NeetCodePage";
@@ -151,7 +152,13 @@ export function App() {
                   type="button"
                   onClick={() => openMatch(match)}
                 >
-                  <span className="result-mark">{match.kind === "problem" ? "NC" : match.kind === "resource" ? match.resource.mark : "//"}</span>
+                  <span className="result-mark">
+                    {match.kind === "problem"
+                      ? <BrandGlyph brand="neetcode" fallback="NC" />
+                      : match.kind === "resource"
+                        ? <BrandGlyph {...brandIdentity(match.resource.url)} fallback={match.resource.mark} />
+                        : "//"}
+                  </span>
                   <span>
                     <b>{match.kind === "problem" ? match.problem.title : match.kind === "resource" ? match.resource.title : match.title}</b>
                     <small>{match.kind === "problem" ? `NeetCode 150 · ${match.problem.topic}` : match.kind === "resource" ? `Resource · ${match.resource.subtitle}` : `Section · ${match.subtitle}`}</small>

@@ -2,28 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { loadTodos, saveTodo } from "../api";
+import { BrandGlyph, brandIdentity } from "../components/BrandLogo";
 import { priorityResources } from "../resources";
 import type { DashboardLink, DashboardSnapshot, DigestItem, QuickAction, QuietLink } from "../types";
 
 type Props = { dashboard: DashboardSnapshot };
 
-const markRules: Array<[string, string, string]> = [
-  ["linkedin.com", "in", "linkedin"], ["github.com", "GH", "github"],
-  ["youtube.com", "YT", "youtube"], ["leetcode.com", "LC", "leetcode"],
-  ["neetcode.io", "NC", "neetcode"], ["freecodecamp.org", "fC", "freecodecamp"],
-  ["notion.so", "N", "notion"], ["jobright.ai", "JR", "jobright"],
-  ["simplify.jobs", "S", "simplify"], ["mail.google.com", "M", "gmail"],
-  ["joinhandshake.com", "H", "handshake"], ["google.com", "G", "google"],
-];
-
-function identity(url: string) {
-  const match = markRules.find(([host]) => url.includes(host));
-  return match ? { mark: match[1], brand: match[2] } : { mark: "↗", brand: "default" };
-}
+const identity = brandIdentity;
 
 function LinkIcon({ url }: { url: string }) {
   const item = identity(url);
-  return <span className={`legacy-link-icon brand-${item.brand}`} aria-hidden="true">{item.mark}</span>;
+  return <span className={`legacy-link-icon brand-${item.brand}`} data-brand-logo={item.brand} aria-hidden="true"><BrandGlyph brand={item.brand} fallback={item.mark} /></span>;
 }
 
 function Pill({ item, className = "legacy-pill" }: { item: DashboardLink; className?: string }) {

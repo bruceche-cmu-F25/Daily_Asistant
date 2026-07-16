@@ -354,6 +354,9 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
 .legacy-bigbtn b { color: var(--ink); font-size: 15px; }
 .legacy-bigbtn > span:last-child { margin-top: 5px; color: var(--muted); font-size: 10px; }
 .legacy-link-icon { position: relative; width: 25px; height: 25px; flex: 0 0 25px; display: inline-grid; place-items: center; border: 1px solid var(--brand,var(--green)); background: color-mix(in srgb,var(--brand,var(--green)) 18%,#06100b); color: color-mix(in srgb,var(--brand,var(--green)) 68%,white); font-size: 8px; font-weight: 950; box-shadow: 0 0 13px color-mix(in srgb,var(--brand,var(--green)) 18%,transparent); }
+.brand-logo-svg { display: block; width: 72%; height: 72%; color: inherit; }
+.brand-logo-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
+.result-mark .brand-logo-svg { width: 20px; height: 20px; }
 .legacy-bigbtn > .legacy-link-icon { position: absolute; left: 13px; top: 50%; width: 27px; height: 27px; transform: translateY(-50%); }
 .legacy-pill .legacy-link-icon, .legacy-job-pill .legacy-link-icon, .legacy-btn .legacy-link-icon { width: 20px; height: 20px; flex-basis: 20px; }
 .legacy-quiet-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }

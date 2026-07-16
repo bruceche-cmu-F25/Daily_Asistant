@@ -54,7 +54,7 @@ afterEach(cleanup);
 
 describe("App", () => {
   it("renders the local-first home shell", async () => {
-    render(<MemoryRouter><App /></MemoryRouter>);
+    const { container } = render(<MemoryRouter><App /></MemoryRouter>);
     expect(await screen.findByText("Daily")).toBeInTheDocument();
     expect(await screen.findByText(/Focus/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
@@ -62,6 +62,8 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: /看活动/ })).toHaveAttribute("href", "/discover");
     expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
     expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
+    expect(container.querySelector('[data-brand-logo="gmail"] svg')).toBeInTheDocument();
+    expect(container.querySelector('[data-brand-logo="linkedin"] svg')).toBeInTheDocument();
   });
 
   it("finds migrated resources in global search", async () => {
