@@ -2,6 +2,24 @@
 
 每天从 Google Calendar、Notion 和 Brave Search 汇总信息，生成本地页面 `today.html`。页面顶部的教练模式只负责算法刷题：每次推荐一道具体题，并提供完成标准和卡住时的帮助路径。
 
+## React + FastAPI v2 preview
+
+`codex/react-fastapi-refactor` 分支正在以只读方式并行开发新版，本地端口为 `8766`；旧版 `8765` 和现有 SQLite 数据不会被修改。
+
+```bash
+uv sync
+cd frontend && npm install && npm run build && cd ..
+./bin/run_v2_dev.sh
+```
+
+然后打开：
+
+```text
+http://127.0.0.1:8766/
+```
+
+新版当前包含 `/`、`/neetcode`、`/discover` 三条路由，并只读显示现有 NeetCode 150 与旧版刷题记录。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
+
 ## 运行
 
 ```bash

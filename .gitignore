@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+.venv/
 
 # Local credentials and environment files
 .env
@@ -23,6 +24,11 @@ event-plists/
 *.err
 *.out
 *.tmp
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # Local completion history
 data/*.db
