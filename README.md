@@ -113,6 +113,6 @@ Retro shader 主题分别维护在：
 
 ## 自动运行
 
-`~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 每天调用 `bin/run_daily.sh`。生成器会先写临时文件，再原子替换 `today.html`，避免中断时留下不完整页面。
+`~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 每天 09:00 调用 `bin/run_daily.sh`。脚本刷新数据后会打开新版主页 `http://127.0.0.1:8766/`；生成器会先写临时文件，再原子替换 `today.html`，避免中断时留下不完整页面。
 
 页面顶部会显示 Calendar、Notion、Brave Search 三个数据源的生成状态。`pi-web.log` 和 `pi-web.err` 是旧版本遗留文件，当前流程不再启动 pi-web。

@@ -303,11 +303,21 @@ class DashboardTests(unittest.TestCase):
             bin_dir.mkdir()
             fake_generator = bin_dir / 'generate_dashboard.py'
             fake_generator.write_text(
-                '#!/bin/zsh\nprint -r -- "$DASHBOARD_HOME/today.html"\n',
+                '#!/bin/zsh\nprint -r -- "$*" > "$DASHBOARD_HOME/generator-args.txt"\n',
                 encoding='utf-8',
             )
             fake_generator.chmod(0o755)
-            env = dict(os.environ, DASHBOARD_HOME=str(base))
+            fake_open = bin_dir / 'fake_open'
+            fake_open.write_text(
+                '#!/bin/zsh\nprint -r -- "$*" > "$DASHBOARD_HOME/opened-url.txt"\n',
+                encoding='utf-8',
+            )
+            fake_open.chmod(0o755)
+            env = dict(
+                os.environ,
+                DASHBOARD_HOME=str(base),
+                DASHBOARD_OPEN_BIN=str(fake_open),
+            )
             result = subprocess.run(
                 ['zsh', str(run_daily)],
                 text=True,
@@ -315,9 +325,13 @@ class DashboardTests(unittest.TestCase):
                 env=env,
                 check=False,
             )
+            generator_args = (base / 'generator-args.txt').read_text(encoding='utf-8').strip()
+            opened_url = (base / 'opened-url.txt').read_text(encoding='utf-8').strip()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), f'Dashboard updated: {base}/today.html')
+        self.assertEqual(generator_args, '--no-open')
+        self.assertEqual(opened_url, 'http://127.0.0.1:8766/')
 
 
 if __name__ == '__main__':
