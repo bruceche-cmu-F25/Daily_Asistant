@@ -1,10 +1,15 @@
 import sqlite3
+import plistlib
+from pathlib import Path
 
 import anyio
 import httpx
 
 from daily_dashboard import legacy
 from daily_dashboard.main import app
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_health_endpoint():
@@ -69,3 +74,16 @@ def test_dashboard_snapshot_adapter(tmp_path):
 
     assert payload["date"] == "2026-07-15"
     assert payload["events"][0]["key"] == "event:one"
+
+
+def test_v2_launch_agent_runs_at_login_and_keeps_server_alive():
+    service_path = PROJECT_ROOT / "launchd" / "com.bruce.daily-dashboard-v2.plist"
+    with service_path.open("rb") as file:
+        service = plistlib.load(file)
+
+    assert service["Label"] == "com.bruce.daily-dashboard-v2"
+    assert service["RunAtLoad"] is True
+    assert service["KeepAlive"] is True
+    assert service["ProgramArguments"] == [
+        "/Users/bruce/daily-dashboard/bin/run_v2_dev.sh"
+    ]
