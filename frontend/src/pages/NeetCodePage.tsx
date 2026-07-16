@@ -1,59 +1,270 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { createAttempt, loadWorkspace, saveWorkingDraft } from "../api";
-import type { AttemptStatus, NeetCodeSnapshot } from "../types";
+import type { AttemptStatus, NeetCodeSnapshot, Problem, ProblemAttempt } from "../types";
 
 type Props = {
   snapshot: NeetCodeSnapshot;
   onRefresh: () => void;
 };
 
+const ROADMAP_POSITIONS: Record<string, [number, number]> = {
+  "Arrays & Hashing": [440, 20],
+  "Two Pointers": [240, 120],
+  Stack: [640, 120],
+  "Binary Search": [50, 220],
+  "Sliding Window": [260, 220],
+  "Linked List": [600, 220],
+  Trees: [440, 320],
+  Tries: [40, 420],
+  "Heap / Priority Queue": [250, 420],
+  Backtracking: [670, 420],
+  Intervals: [20, 550],
+  Greedy: [210, 550],
+  "Advanced Graphs": [400, 550],
+  Graphs: [590, 550],
+  "1-D Dynamic Programming": [780, 550],
+  "2-D Dynamic Programming": [580, 670],
+  "Bit Manipulation": [790, 670],
+  "Math & Geometry": [690, 770],
+};
+
+const ROADMAP_EDGES = [
+  "M530 86 C530 104 330 102 330 120",
+  "M530 86 C530 104 730 102 730 120",
+  "M330 186 C330 205 140 201 140 220",
+  "M330 186 C330 205 350 201 350 220",
+  "M330 186 C330 205 690 201 690 220",
+  "M140 286 C140 306 530 300 530 320",
+  "M690 286 C690 306 530 300 530 320",
+  "M530 386 C530 406 130 400 130 420",
+  "M530 386 C530 406 340 400 340 420",
+  "M530 386 C530 406 760 400 760 420",
+  "M340 486 C340 515 110 515 110 550",
+  "M340 486 C340 515 300 515 300 550",
+  "M340 486 C340 515 490 515 490 550",
+  "M760 486 C760 515 680 515 680 550",
+  "M760 486 C760 515 870 515 870 550",
+  "M680 616 C680 641 670 641 670 670",
+  "M870 616 C870 641 670 641 670 670",
+  "M870 616 C870 641 880 641 880 670",
+  "M670 736 C670 758 780 750 780 770",
+  "M880 736 C880 758 780 750 780 770",
+];
+
+function formatAttemptDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function isToday(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  return !Number.isNaN(date.getTime()) && date.toDateString() === today.toDateString();
+}
+
+function TopicRoadmap({
+  snapshot,
+  topic,
+  onTopicChange,
+  onPractice,
+}: {
+  snapshot: NeetCodeSnapshot;
+  topic: string;
+  onTopicChange: (topic: string) => void;
+  onPractice: (problem: Problem) => void;
+}) {
+  const selected = snapshot.problems.filter((problem) => problem.topic === topic);
+  const selectedCompleted = selected.filter((problem) => snapshot.progress[problem.key]?.completed).length;
+
+  return (
+    <section className="panel section-block roadmap" aria-label="NeetCode 150 topic graph">
+      <div className="roadmap-head">
+        <div>
+          <p className="eyebrow">NEETCODE 150 / ALL PROBLEMS</p>
+          <h2>Roadmap / 路线图</h2>
+        </div>
+        <div className="roadmap-total"><b>{snapshot.summary.completed}</b><span>/ {snapshot.summary.total} complete</span></div>
+      </div>
+      <p className="roadmap-copy">按 NeetCode 的依赖顺序浏览 Topic。点击节点查看完整题单，也可以从任意旧题开始新的 attempt。</p>
+      <div className="roadmap-scroll">
+        <div className="roadmap-canvas">
+          <svg className="roadmap-edges" viewBox="0 0 1060 850" aria-hidden="true">
+            <defs>
+              <marker id="roadmap-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M0 0 L8 4 L0 8 z" />
+              </marker>
+            </defs>
+            {ROADMAP_EDGES.map((path) => <path d={path} key={path} markerEnd="url(#roadmap-arrow)" />)}
+          </svg>
+          {snapshot.topics.map((item) => {
+            const position = ROADMAP_POSITIONS[item.name];
+            if (!position) return null;
+            const complete = item.total > 0 && item.completed === item.total;
+            return (
+              <button
+                aria-pressed={topic === item.name}
+                aria-label={`${item.name}: ${item.completed} of ${item.total} completed`}
+                className={`roadmap-node${topic === item.name ? " active" : ""}${complete ? " complete" : ""}`}
+                key={item.name}
+                style={{ left: position[0], top: position[1] }}
+                type="button"
+                onClick={() => onTopicChange(item.name)}
+              >
+                <span>{item.name}</span><b>{item.completed}/{item.total}</b>
+                <progress aria-label={`${item.name} progress`} max={item.total || 1} value={item.completed} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="roadmap-list-panel" aria-live="polite">
+        <div className="roadmap-list-head">
+          <div><span>SELECTED TOPIC</span><h3>{topic}</h3></div>
+          <b>{selectedCompleted} / {selected.length}</b>
+        </div>
+        <ol className="roadmap-problem-list">
+          {selected.map((problem, index) => {
+            const progress = snapshot.progress[problem.key];
+            return (
+              <li className={progress?.completed ? "done" : ""} key={problem.key}>
+                <span className="roadmap-problem-marker">{progress?.completed ? "✓" : String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <a href={problem.start_url} target="_blank" rel="noreferrer">{problem.title}</a>
+                  <span>{problem.difficulty} · {problem.minutes} min · {progress?.attempt_count || 0} attempts</span>
+                </div>
+                <button type="button" onClick={() => onPractice(problem)}>WRITE</button>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+function ProblemHistory({ snapshot }: { snapshot: NeetCodeSnapshot }) {
+  const problemByKey = useMemo(
+    () => new Map(snapshot.problems.map((problem) => [problem.key, problem])),
+    [snapshot.problems],
+  );
+  const attemptsByProblem = useMemo(() => {
+    const grouped = new Map<string, ProblemAttempt[]>();
+    snapshot.attempts.forEach((attempt) => {
+      const attempts = grouped.get(attempt.problem_key) || [];
+      attempts.push(attempt);
+      grouped.set(attempt.problem_key, attempts);
+    });
+    return [...grouped.entries()];
+  }, [snapshot.attempts]);
+  const todayCount = snapshot.attempts.filter((attempt) => isToday(attempt.created_at)).length;
+
+  return (
+    <section className="panel section-block problem-history" id="history" aria-label="Problem history">
+      <div className="history-head">
+        <div>
+          <p className="eyebrow">LOCAL PROBLEM DATABASE</p>
+          <h2>History / 刷题记录</h2>
+          <p>按 Topic 看 NeetCode 150 进度；每道题会保留所有 attempts、Python solution 和心得。</p>
+        </div>
+        <div className="history-stats" aria-label="Problem history summary">
+          <div><b>{snapshot.summary.completed}</b><span>completed</span></div>
+          <div><b>{snapshot.summary.total}</b><span>total</span></div>
+          <div><b>{snapshot.summary.stuck}</b><span>stuck</span></div>
+          <div><b>{snapshot.attempts.length}</b><span>attempts</span></div>
+          <div><b>{todayCount}</b><span>today</span></div>
+        </div>
+      </div>
+      <div className="history-topic-grid">
+        {snapshot.topics.map((item) => (
+          <article className="history-topic" key={item.name}>
+            <div><b>{item.name}</b><span>{item.completed}/{item.total}</span></div>
+            <progress aria-label={`${item.name}: ${item.completed} of ${item.total}`} max={item.total || 1} value={item.completed} />
+          </article>
+        ))}
+      </div>
+      <div className="problem-history-list">
+        {attemptsByProblem.map(([problemKey, attempts]) => {
+          const problem = problemByKey.get(problemKey);
+          const solved = attempts.some((attempt) => attempt.status === "solved");
+          return (
+            <article className={`history-entry${solved ? " solved" : ""}`} key={problemKey}>
+              <div className="history-entry-top">
+                <div>
+                  {problem ? <a href={problem.start_url} target="_blank" rel="noreferrer">{problem.title}</a> : <b>{problemKey}</b>}
+                  <span>{problem?.topic || "Unknown topic"} · {problem?.difficulty || ""} · latest {formatAttemptDate(attempts[0].created_at)}</span>
+                </div>
+                <b>{attempts.length} {attempts.length === 1 ? "ATTEMPT" : "ATTEMPTS"}</b>
+              </div>
+              <div className="attempt-timeline">
+                {attempts.map((attempt, index) => (
+                  <details key={attempt.id}>
+                    <summary>
+                      <span>ATTEMPT {attempts.length - index} · {attempt.status.toUpperCase()} · {attempt.language.toUpperCase()}</span>
+                      <time dateTime={attempt.created_at}>{formatAttemptDate(attempt.created_at)}</time>
+                    </summary>
+                    <div className="history-notes">
+                      <b>SOLUTION</b>
+                      <pre>{attempt.solution || "No solution saved."}</pre>
+                      <b>REFLECTION / 心得</b>
+                      <p>{attempt.reflection || "No reflection saved."}</p>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      {!attemptsByProblem.length && <p className="problem-history-empty">还没有刷题记录。完成第一道题后会出现在这里。</p>}
+    </section>
+  );
+}
+
 export function NeetCodePage({ snapshot, onRefresh }: Props) {
   const [topic, setTopic] = useState("Arrays & Hashing");
+  const firstPending = snapshot.problems.find((problem) => !snapshot.progress[problem.key]?.completed);
+  const [activeProblemKey, setActiveProblemKey] = useState("");
+  const activeProblem = snapshot.problems.find((problem) => problem.key === activeProblemKey) || firstPending || snapshot.problems[0];
   const [solution, setSolution] = useState("");
   const [reflection, setReflection] = useState("");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [saveState, setSaveState] = useState("Ready");
   const [saving, setSaving] = useState(false);
-  const selected = useMemo(
-    () => snapshot.problems.filter((problem) => problem.topic === topic),
-    [snapshot.problems, topic],
-  );
-  const nextProblem = snapshot.problems.find((problem) => !snapshot.progress[problem.key]?.completed);
-  const titles = useMemo(
-    () => Object.fromEntries(snapshot.problems.map((problem) => [problem.key, problem.title])),
-    [snapshot.problems],
-  );
 
   useEffect(() => {
-    if (!nextProblem) return;
+    if (!activeProblem) return;
     let active = true;
     setWorkspaceReady(false);
-    loadWorkspace(nextProblem.key).then((workspace) => {
+    loadWorkspace(activeProblem.key).then((workspace) => {
       if (!active) return;
       setSolution(workspace.draft?.solution || "");
       setReflection(workspace.draft?.reflection || "");
       setWorkspaceReady(true);
-      setSaveState(workspace.draft ? "Draft restored" : "Ready");
+      setSaveState(workspace.draft ? "Draft restored" : `${workspace.attempts.length} previous attempts`);
     }).catch((reason: unknown) => {
       if (active) setSaveState(reason instanceof Error ? reason.message : "Workspace unavailable");
     });
     return () => { active = false; };
-  }, [nextProblem?.key]);
+  }, [activeProblem?.key]);
 
   useEffect(() => {
-    if (!nextProblem || !workspaceReady || (!solution && !reflection)) return;
+    if (!activeProblem || !workspaceReady || (!solution && !reflection)) return;
     setSaveState("Saving draft…");
     const timeout = window.setTimeout(() => {
-      saveWorkingDraft(nextProblem.key, { language: "python", solution, reflection })
+      saveWorkingDraft(activeProblem.key, { language: "python", solution, reflection })
         .then(() => setSaveState("Draft saved"))
         .catch(() => setSaveState("Draft save failed"));
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [nextProblem?.key, reflection, solution, workspaceReady]);
+  }, [activeProblem?.key, reflection, solution, workspaceReady]);
 
   const submitAttempt = async (status: AttemptStatus) => {
-    if (!nextProblem || saving) return;
+    if (!activeProblem || saving) return;
     if (status === "solved" && !solution.trim()) {
       setSaveState("Solution is required for Solved");
       return;
@@ -61,7 +272,7 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
     setSaving(true);
     setSaveState(`Saving ${status}…`);
     try {
-      await createAttempt(nextProblem.key, { status, language: "python", solution, reflection });
+      await createAttempt(activeProblem.key, { status, language: "python", solution, reflection });
       if (status !== "draft") {
         setSolution("");
         setReflection("");
@@ -75,14 +286,27 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
     }
   };
 
+  const practiceProblem = (problem: Problem) => {
+    setActiveProblemKey(problem.key);
+    setTopic(problem.topic);
+    window.requestAnimationFrame(() => {
+      const workspace = document.getElementById("problem-workspace");
+      if (typeof workspace?.scrollIntoView === "function") {
+        workspace.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  };
+
   return (
-    <main>
-      <section className="panel coach-block">
-        <p className="eyebrow">DO NOW / OFFICIAL ORDER</p>
-        <h1 className="page-title">{nextProblem?.title ?? "NeetCode 150 complete"}</h1>
-        {nextProblem && <p>{nextProblem.topic} · {nextProblem.difficulty} · Python</p>}
-        {nextProblem && <a className="primary-link" href={nextProblem.start_url} target="_blank" rel="noreferrer">OPEN NEETCODE ↗</a>}
-        {nextProblem && (
+    <main className="neetcode-page">
+      <section className="panel coach-block" id="problem-workspace">
+        <div className="coach-title-row">
+          <div><p className="eyebrow">DO NOW / OFFICIAL ORDER</p><h1 className="page-title">{activeProblem?.title ?? "NeetCode 150 complete"}</h1></div>
+          {firstPending && activeProblem?.key !== firstPending.key && <button type="button" onClick={() => practiceProblem(firstPending)}>NEXT UNSOLVED ↗</button>}
+        </div>
+        {activeProblem && <p>{activeProblem.topic} · {activeProblem.difficulty} · Python · {snapshot.progress[activeProblem.key]?.attempt_count || 0} previous attempts</p>}
+        {activeProblem && <a className="primary-link" href={activeProblem.start_url} target="_blank" rel="noreferrer">OPEN NEETCODE ↗</a>}
+        {activeProblem && (
           <div className="solution-workspace">
             <div className="workspace-heading"><div><p className="eyebrow">PYTHON WORKSPACE</p><h2>Solution / 解法</h2></div><span>{saveState}</span></div>
             <label htmlFor="solution-editor">Solution is required to mark Solved</label>
@@ -111,39 +335,8 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
           </div>
         )}
       </section>
-      <section className="panel section-block">
-        <div className="section-heading"><div><p className="eyebrow">NEETCODE 150</p><h2>Roadmap / 路线图</h2></div><b>{snapshot.summary.completed}/{snapshot.summary.total}</b></div>
-        <div className="topic-grid">
-          {snapshot.topics.map((item) => (
-            <button className={topic === item.name ? "active" : ""} key={item.name} type="button" onClick={() => setTopic(item.name)}>
-              <span>{item.name}</span><b>{item.completed}/{item.total}</b>
-              <progress max={item.total} value={item.completed} />
-            </button>
-          ))}
-        </div>
-      </section>
-      <section className="panel section-block">
-        <div className="section-heading"><h2>{topic}</h2><b>{selected.filter((item) => snapshot.progress[item.key]?.completed).length}/{selected.length}</b></div>
-        <ol className="problem-list">
-          {selected.map((problem) => {
-            const done = snapshot.progress[problem.key]?.completed;
-            return <li className={done ? "done" : ""} key={problem.key}><span>{done ? "✓" : "·"}</span><a href={problem.start_url} target="_blank" rel="noreferrer">{problem.title}</a><small>{problem.difficulty}</small></li>;
-          })}
-        </ol>
-      </section>
-      <section className="panel section-block">
-        <p className="eyebrow">ATTEMPT HISTORY</p>
-        <h2>All attempts / 全部记录</h2>
-        <div className="history-list">
-          {snapshot.attempts.map((attempt) => (
-            <details key={attempt.id}>
-              <summary><span><b>{titles[attempt.problem_key] || attempt.problem_key}</b> · {attempt.status.toUpperCase()}</span><span>{attempt.created_at}</span></summary>
-              <pre>{attempt.solution || "No solution saved."}</pre>
-              <p>{attempt.reflection || "No reflection saved."}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <TopicRoadmap snapshot={snapshot} topic={topic} onTopicChange={setTopic} onPractice={practiceProblem} />
+      <ProblemHistory snapshot={snapshot} />
     </main>
   );
 }

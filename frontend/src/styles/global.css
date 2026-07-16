@@ -103,21 +103,75 @@ main { padding: 22px; }
 .home-grid .section-block { margin-top: 16px; }
 .muted-copy { color: var(--muted); line-height: 1.7; }
 .compact-resources .resource-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
-.topic-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
-.topic-grid button { display: grid; grid-template-columns: 1fr auto; gap: 9px; padding: 14px; border: 1px solid var(--line); color: var(--ink); text-align: left; background: #07100c; cursor: pointer; }
-.topic-grid button.active { border-color: var(--green); background: #122219; }
-.topic-grid button b { color: var(--cyan); }
-.topic-grid progress { grid-column: 1 / -1; width: 100%; accent-color: var(--green); }
-.problem-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; padding: 0; list-style: none; }
-.problem-list li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); }
-.problem-list li.done { border-color: #436c4f; }
-.problem-list li.done > span { color: var(--green); }
-.problem-list small { color: var(--muted); }
-.history-list details { padding: 14px 0; border-top: 1px solid var(--line); }
-.history-list summary { display: flex; justify-content: space-between; gap: 20px; cursor: pointer; }
-.history-list summary span { color: var(--muted); font-size: 10px; }
-.history-list pre { overflow: auto; padding: 14px; border: 1px solid var(--line); color: #c7e6bf; background: #010403; }
-.history-list p { color: var(--muted); }
+.neetcode-page { display: grid; gap: 16px; }
+.neetcode-page > .section-block, .neetcode-page > .coach-block { margin-top: 0; }
+.coach-title-row { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+.coach-title-row > button { margin-top: 8px; padding: 10px 13px; border: 1px solid var(--cyan); color: var(--cyan); background: rgba(103,216,234,.06); cursor: pointer; white-space: nowrap; }
+.roadmap { overflow: hidden; }
+.roadmap-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.roadmap-head h2 { margin-bottom: 0; }
+.roadmap-total { display: flex; align-items: baseline; gap: 8px; color: var(--muted); text-transform: uppercase; }
+.roadmap-total b { color: var(--green); font-size: 38px; }
+.roadmap-total span { font-size: 9px; letter-spacing: .08em; }
+.roadmap-copy { max-width: 760px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+.roadmap-scroll { margin-top: 18px; overflow-x: auto; border: 1px solid var(--line); background: rgba(0,0,0,.22); scrollbar-color: var(--green) rgba(255,255,255,.05); }
+.roadmap-canvas { position: relative; width: 1060px; height: 850px; margin: 0 auto; background: linear-gradient(rgba(103,232,249,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(103,232,249,.025) 1px,transparent 1px); background-size: 42px 42px; }
+.roadmap-edges { position: absolute; inset: 0; width: 1060px; height: 850px; color: rgba(219,231,211,.52); pointer-events: none; }
+.roadmap-edges > path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.roadmap-edges marker path { fill: currentColor; stroke: none; }
+.roadmap-node { position: absolute; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: 1fr 6px; gap: 8px; width: 180px; height: 66px; padding: 11px 12px 9px; border: 1px solid rgba(103,232,249,.42); border-radius: 5px; color: var(--ink); background: #111a2d; box-shadow: 3px 3px 0 rgba(103,232,249,.08); cursor: pointer; }
+.roadmap-node:hover, .roadmap-node.active { border-color: var(--green); background: #182a27; box-shadow: 0 0 18px rgba(165,255,116,.13); }
+.roadmap-node.complete { border-color: var(--green); }
+.roadmap-node span { overflow: hidden; align-self: center; font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.roadmap-node b { align-self: center; color: var(--cyan); font-size: 9px; }
+.roadmap-node progress { grid-column: 1 / -1; width: 100%; height: 6px; accent-color: var(--green); }
+.roadmap-list-panel { margin-top: 12px; padding: clamp(15px,2vw,22px); border: 1px solid var(--line); background: rgba(1,5,4,.72); }
+.roadmap-list-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+.roadmap-list-head span { color: var(--amber); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.roadmap-list-head h3 { margin: 4px 0 0; color: var(--ink); font-size: 21px; }
+.roadmap-list-head > b { color: var(--green); font-size: 18px; }
+.roadmap-problem-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin: 17px 0 0; padding: 0; list-style: none; }
+.roadmap-problem-list li { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; align-items: center; min-width: 0; border: 1px solid var(--line); background: rgba(0,0,0,.22); }
+.roadmap-problem-list li.done { border-color: rgba(165,255,116,.45); background: rgba(165,255,116,.035); }
+.roadmap-problem-marker { display: grid; align-self: stretch; place-items: center; border-right: 1px solid var(--line); color: var(--muted); font-size: 9px; }
+.roadmap-problem-list li.done .roadmap-problem-marker { color: var(--green); }
+.roadmap-problem-list li > div { min-width: 0; padding: 10px; }
+.roadmap-problem-list a, .roadmap-problem-list li > div > span { display: block; }
+.roadmap-problem-list a { overflow: hidden; color: var(--ink); font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.roadmap-problem-list a:hover { color: var(--green); }
+.roadmap-problem-list li > div > span { margin-top: 4px; color: var(--muted); font-size: 8px; text-transform: uppercase; }
+.roadmap-problem-list button { align-self: stretch; padding: 0 10px; border: 0; border-left: 1px solid var(--line); color: var(--cyan); background: rgba(103,216,234,.035); font-size: 8px; font-weight: 800; cursor: pointer; }
+.roadmap-problem-list button:hover { color: var(--green); background: rgba(165,255,112,.08); }
+.problem-history { scroll-margin-top: 76px; }
+.history-head { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 24px; }
+.history-head > div > p:last-child { max-width: 680px; margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.history-stats { display: grid; grid-template-columns: repeat(5,minmax(74px,1fr)); gap: 7px; }
+.history-stats div { min-width: 74px; padding: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.22); }
+.history-stats b, .history-stats span { display: block; }
+.history-stats b { color: var(--green); font-size: 21px; }
+.history-stats span { margin-top: 3px; color: var(--muted); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.history-topic-grid { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 7px; margin-top: 24px; }
+.history-topic { min-width: 0; padding: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.2); }
+.history-topic > div { display: flex; justify-content: space-between; gap: 8px; }
+.history-topic b { overflow: hidden; color: var(--ink); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.history-topic span { color: var(--cyan); font-size: 9px; }
+.history-topic progress { width: 100%; height: 5px; margin-top: 9px; accent-color: var(--green); }
+.problem-history-list { display: grid; gap: 8px; margin-top: 22px; }
+.history-entry { border: 1px solid var(--line); border-left: 4px solid var(--amber); background: rgba(0,0,0,.22); }
+.history-entry.solved { border-left-color: var(--green); }
+.history-entry-top { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 13px 15px; }
+.history-entry-top div { min-width: 0; }
+.history-entry-top a, .history-entry-top span { display: block; }
+.history-entry-top a { overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.history-entry-top span { margin-top: 4px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.history-entry-top > b { color: var(--green); font-size: 9px; letter-spacing: .1em; white-space: nowrap; }
+.attempt-timeline details { border-top: 1px solid var(--line); }
+.attempt-timeline summary { display: flex; justify-content: space-between; gap: 20px; padding: 11px 15px; color: var(--cyan); font-size: 10px; cursor: pointer; }
+.attempt-timeline time { color: var(--muted); font-size: 9px; }
+.history-notes { display: grid; gap: 8px; padding: 4px 15px 15px; }
+.history-notes > b { color: var(--amber); font-size: 9px; letter-spacing: .08em; }
+.history-notes pre, .history-notes p { margin: 0; padding: 12px; border: 1px solid var(--line); color: #c7d0be; background: #010604; font: 11px/1.55 "SFMono-Regular",Consolas,monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.problem-history-empty { margin: 22px 0 0; padding: 22px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
 .solution-workspace { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
 .workspace-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .workspace-heading h2 { margin: 0 0 14px; }
@@ -139,6 +193,9 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
   .hero, .two-column, .home-grid { grid-template-columns: 1fr; }
   .metrics { margin-top: 28px; }
   .priority-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .history-head { grid-template-columns: 1fr; }
+  .history-topic-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .roadmap-problem-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
 @media (max-width: 600px) {
@@ -151,6 +208,9 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
   .metrics { grid-template-columns: 1fr; }
   .priority-grid, .resource-grid, .priority-strip { grid-template-columns: 1fr; }
   .section-heading { align-items: start; flex-direction: column; }
+  .coach-title-row, .roadmap-head, .roadmap-list-head, .attempt-timeline summary { align-items: start; flex-direction: column; }
+  .history-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .history-topic-grid, .roadmap-problem-list { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
