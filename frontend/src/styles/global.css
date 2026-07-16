@@ -166,6 +166,13 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
 .legacy-hero h1 { margin: 0; color: var(--ink); font-size: clamp(56px,8vw,118px); font-weight: 950; letter-spacing: -.08em; line-height: .82; text-transform: uppercase; text-shadow: 2px 0 rgba(255,95,158,.34),-2px 0 rgba(103,232,249,.25),0 0 24px rgba(165,255,116,.06); }
 .legacy-hero h1 span { color: var(--green); }
 .legacy-hero-lede { max-width: 640px; margin: 26px 0 0; color: #c3ccba; font-size: clamp(14px,1.3vw,19px); }
+.legacy-hero-actions { display: grid; grid-template-columns: repeat(2,minmax(0,220px)); gap: 9px; margin-top: 26px; }
+.legacy-primary-action { --action: var(--green); display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto; align-items: center; gap: 2px 11px; min-height: 64px; padding: 11px 14px; border: 1px solid color-mix(in srgb,var(--action) 55%,var(--line)); border-left: 3px solid var(--action); background: color-mix(in srgb,var(--action) 6%,rgba(0,0,0,.32)); color: var(--ink); transition: transform .14s ease,border-color .14s ease,box-shadow .14s ease,background-color .14s ease; }
+.legacy-primary-action > span { grid-row: 1 / span 2; display: grid; place-items: center; width: 27px; height: 27px; border: 1px solid var(--action); color: var(--action); font-size: 9px; font-weight: 900; }
+.legacy-primary-action b { color: var(--ink); font-size: 15px; }
+.legacy-primary-action small { color: var(--muted); font-size: 8px; letter-spacing: .08em; }
+.legacy-primary-action.discover { --action: var(--cyan); }
+.legacy-primary-action:hover { border-color: var(--action); background: color-mix(in srgb,var(--action) 11%,rgba(0,0,0,.32)); color: var(--ink); box-shadow: 0 0 18px color-mix(in srgb,var(--action) 12%,transparent); transform: translateY(-1px); }
 .legacy-hero-meta { margin-top: 24px; color: var(--muted); font-size: 11px; letter-spacing: .03em; }
 .legacy-hero-meta a { color: var(--cyan); }
 .legacy-hero-readout { align-self: stretch; display: grid; align-content: center; gap: 14px; padding-left: clamp(22px,4vw,54px); border-left: 1px solid var(--line); }
@@ -259,6 +266,7 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
   .legacy-hero { padding: 28px 20px; }
   .legacy-metrics, .legacy-status-row, .legacy-digest-grid, .legacy-quiet-grid { grid-template-columns: 1fr; }
   .legacy-quick { grid-template-columns: 1fr; }
+  .legacy-hero-actions { grid-template-columns: 1fr; }
   .legacy-event { grid-template-columns: 1fr; }
   .legacy-event .legacy-btn, .legacy-event .legacy-no-link { grid-column: 1; grid-row: auto; margin-top: 10px; }
 }
