@@ -137,7 +137,7 @@ function TopicRoadmap({
                   <a href={problem.start_url} target="_blank" rel="noreferrer">{problem.title}</a>
                   <span>{problem.difficulty} · {problem.minutes} min · {progress?.attempt_count || 0} attempts</span>
                 </div>
-                <button type="button" onClick={() => onPractice(problem)}>WRITE</button>
+                <button type="button" onClick={() => onPractice(problem)}>DO NOW</button>
               </li>
             );
           })}
@@ -227,14 +227,22 @@ function ProblemHistory({ snapshot }: { snapshot: NeetCodeSnapshot }) {
 
 export function NeetCodePage({ snapshot, onRefresh }: Props) {
   const [topic, setTopic] = useState("Arrays & Hashing");
-  const firstPending = snapshot.problems.find((problem) => !snapshot.progress[problem.key]?.completed);
+  const [budget, setBudget] = useState(30);
   const [activeProblemKey, setActiveProblemKey] = useState("");
-  const activeProblem = snapshot.problems.find((problem) => problem.key === activeProblemKey) || firstPending || snapshot.problems[0];
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const pendingProblems = snapshot.problems.filter((problem) => !snapshot.progress[problem.key]?.completed);
+  const fittingProblems = pendingProblems.filter((problem) => problem.minutes <= budget);
+  const suggestedProblem = fittingProblems[0] || pendingProblems[0];
+  const activeProblem = snapshot.problems.find((problem) => problem.key === activeProblemKey) || suggestedProblem;
   const [solution, setSolution] = useState("");
   const [reflection, setReflection] = useState("");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [saveState, setSaveState] = useState("Ready");
   const [saving, setSaving] = useState(false);
+  const todaySolved = snapshot.attempts.filter((attempt) => attempt.status === "solved" && isToday(attempt.created_at)).length;
+  const upcomingPool = fittingProblems.length ? fittingProblems : pendingProblems;
+  const upcoming = upcomingPool.filter((problem) => problem.key !== activeProblem?.key).slice(0, 2);
 
   useEffect(() => {
     if (!activeProblem) return;
@@ -250,6 +258,11 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
       if (active) setSaveState(reason instanceof Error ? reason.message : "Workspace unavailable");
     });
     return () => { active = false; };
+  }, [activeProblem?.key]);
+
+  useEffect(() => {
+    setCompletionOpen(false);
+    setHelpOpen(false);
   }, [activeProblem?.key]);
 
   useEffect(() => {
@@ -277,6 +290,10 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
         setSolution("");
         setReflection("");
       }
+      if (status === "solved") {
+        setCompletionOpen(false);
+        setActiveProblemKey("");
+      }
       setSaveState(`${status[0].toUpperCase()}${status.slice(1)} attempt saved`);
       onRefresh();
     } catch (reason) {
@@ -289,6 +306,8 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
   const practiceProblem = (problem: Problem) => {
     setActiveProblemKey(problem.key);
     setTopic(problem.topic);
+    setCompletionOpen(false);
+    setHelpOpen(false);
     window.requestAnimationFrame(() => {
       const workspace = document.getElementById("problem-workspace");
       if (typeof workspace?.scrollIntoView === "function") {
@@ -297,18 +316,106 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
     });
   };
 
+  const skipProblem = () => {
+    if (!activeProblem || !upcomingPool.length) return;
+    const currentIndex = upcomingPool.findIndex((problem) => problem.key === activeProblem.key);
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % upcomingPool.length;
+    practiceProblem(upcomingPool[nextIndex]);
+  };
+
+  const markStuck = async () => {
+    setHelpOpen(true);
+    await submitAttempt("stuck");
+  };
+
   return (
     <main className="neetcode-page">
-      <section className="panel coach-block" id="problem-workspace">
-        <div className="coach-title-row">
-          <div><p className="eyebrow">DO NOW / OFFICIAL ORDER</p><h1 className="page-title">{activeProblem?.title ?? "NeetCode 150 complete"}</h1></div>
-          {firstPending && activeProblem?.key !== firstPending.key && <button type="button" onClick={() => practiceProblem(firstPending)}>NEXT UNSOLVED ↗</button>}
+      <section className="panel coach-block problem-coach" id="problem-workspace" aria-label="Problem coach">
+        <div className="problem-coach-head">
+          <div>
+            <p className="eyebrow">PROBLEM COACH</p>
+            <h1>Do Now / 现在刷这题</h1>
+            <p>一次只做一道 NeetCode 150。做完以后再记录 solution 和心得，全部只保存在这台 Mac。</p>
+          </div>
+          <div className="coach-today"><b>{todaySolved}</b><span>problems today</span></div>
         </div>
-        {activeProblem && <p>{activeProblem.topic} · {activeProblem.difficulty} · Python · {snapshot.progress[activeProblem.key]?.attempt_count || 0} previous attempts</p>}
-        {activeProblem && <a className="primary-link" href={activeProblem.start_url} target="_blank" rel="noreferrer">OPEN NEETCODE ↗</a>}
+        <div className="time-budget" role="group" aria-label="Available problem-solving time">
+          <span>我现在有</span>
+          {[15, 30, 45, 60].map((minutes) => (
+            <button
+              className={budget === minutes ? "active" : ""}
+              key={minutes}
+              type="button"
+              onClick={() => { setBudget(minutes); setActiveProblemKey(""); }}
+            >
+              {minutes} MIN
+            </button>
+          ))}
+        </div>
         {activeProblem && (
-          <div className="solution-workspace">
-            <div className="workspace-heading"><div><p className="eyebrow">PYTHON WORKSPACE</p><h2>Solution / 解法</h2></div><span>{saveState}</span></div>
+          <article className="do-now-card">
+            <div className="do-now-main">
+              <div className="problem-badges">
+                <span>{activeProblem.topic}</span>
+                <span className={`difficulty-${activeProblem.difficulty.toLowerCase()}`}>{activeProblem.difficulty}</span>
+                <span>{activeProblem.minutes} MIN</span>
+              </div>
+              <h2>{activeProblem.title}</h2>
+              <p>{activeProblem.why || `推进 NeetCode 150 的 ${activeProblem.topic} 路线，一次只解决一道题。`}</p>
+              <div className="coach-actions">
+                <a href={activeProblem.start_url} target="_blank" rel="noreferrer">OPEN PROBLEM / 开始刷题</a>
+                <button type="button" disabled={saving} onClick={markStuck}>不会做 / 卡住了</button>
+                <button className="finish" type="button" onClick={() => setCompletionOpen(true)}>完成并写心得</button>
+                <button type="button" onClick={skipProblem}>换一题</button>
+              </div>
+              {helpOpen && (
+                <div className="coach-help">
+                  <b>IF STUCK / 先别看答案</b>
+                  <ol>
+                    <li>手写一个输入输出例子，确认自己理解题意。</li>
+                    <li>{activeProblem.starter || "先写暴力解法，再确定需要的数据结构。"}</li>
+                    <li>仍然卡住时再看 NeetCode 提示，然后自己重写。</li>
+                  </ol>
+                </div>
+              )}
+            </div>
+            <aside className="done-when">
+              <b>DONE WHEN</b>
+              <p>{activeProblem.done_when || "独立通过全部测试，并写下复杂度、核心思路和一个容易出错的点。"}</p>
+              <span>{snapshot.progress[activeProblem.key]?.attempt_count || 0} previous attempts</span>
+            </aside>
+          </article>
+        )}
+        {!activeProblem && (
+          <div className="coach-complete">
+            <b>NeetCode 150 已经全部完成。</b>
+            <span>可以从 Roadmap 选择旧题开始新的 attempt。</span>
+          </div>
+        )}
+        <div className="coach-up-next">
+          <b>UP NEXT</b>
+          <ol>
+            {upcoming.map((problem) => (
+              <li key={problem.key}>
+                <button type="button" onClick={() => practiceProblem(problem)}>
+                  <strong>{problem.title}</strong>
+                  <span>{problem.difficulty} · {problem.topic}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+      <TopicRoadmap snapshot={snapshot} topic={topic} onTopicChange={setTopic} onPractice={practiceProblem} />
+      <ProblemHistory snapshot={snapshot} />
+      {completionOpen && activeProblem && (
+        <div className="completion-backdrop">
+          <section className="completion-dialog" role="dialog" aria-modal="true" aria-labelledby="completion-dialog-title">
+            <div className="completion-dialog-head">
+              <div><p className="eyebrow">COMPLETE ATTEMPT</p><h2 id="completion-dialog-title">保存刷题记录</h2></div>
+              <button type="button" aria-label="关闭保存窗口" onClick={() => setCompletionOpen(false)}>×</button>
+            </div>
+            <p className="completion-problem">{activeProblem.title} · {activeProblem.topic} · {saveState}</p>
             <label htmlFor="solution-editor">Solution is required to mark Solved</label>
             <textarea
               id="solution-editor"
@@ -324,19 +431,18 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
               rows={14}
               spellCheck={false}
               placeholder="def solution(...):"
+              autoFocus
             />
             <label htmlFor="reflection-editor">Reflection / 心得（可选）</label>
             <textarea id="reflection-editor" value={reflection} onChange={(event) => setReflection(event.target.value)} rows={4} placeholder="核心模式、复杂度、容易错的点…" />
-            <div className="workspace-actions">
+            <div className="completion-actions">
+              <button type="button" onClick={() => setCompletionOpen(false)}>CANCEL</button>
               <button type="button" disabled={saving || (!solution && !reflection)} onClick={() => submitAttempt("draft")}>SAVE DRAFT</button>
-              <button type="button" disabled={saving} onClick={() => submitAttempt("stuck")}>SAVE AS STUCK</button>
               <button className="solved" type="button" disabled={saving || !solution.trim()} onClick={() => submitAttempt("solved")}>MARK SOLVED</button>
             </div>
-          </div>
-        )}
-      </section>
-      <TopicRoadmap snapshot={snapshot} topic={topic} onTopicChange={setTopic} onPractice={practiceProblem} />
-      <ProblemHistory snapshot={snapshot} />
+          </section>
+        </div>
+      )}
     </main>
   );
 }

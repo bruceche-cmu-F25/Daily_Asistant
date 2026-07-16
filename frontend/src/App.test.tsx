@@ -71,9 +71,12 @@ describe("App", () => {
     expect(await screen.findByText(/Profile \+ job search/)).toBeInTheDocument();
   });
 
-  it("requires a solution before marking a problem solved", async () => {
+  it("asks for the solution only after the user finishes the problem", async () => {
     render(<MemoryRouter initialEntries={["/neetcode"]}><App /></MemoryRouter>);
-    const editor = await screen.findByLabelText("Solution is required to mark Solved");
+    expect(screen.queryByLabelText("Solution is required to mark Solved")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "完成并写心得" }));
+    expect(screen.getByRole("dialog", { name: "保存刷题记录" })).toBeInTheDocument();
+    const editor = screen.getByLabelText("Solution is required to mark Solved");
     const solved = screen.getByRole("button", { name: "MARK SOLVED" });
     expect(solved).toBeDisabled();
     fireEvent.change(editor, { target: { value: "def two_sum():\n    return []" } });
@@ -85,7 +88,7 @@ describe("App", () => {
     expect(await screen.findByRole("region", { name: "NeetCode 150 topic graph" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Two Pointers: 0 of 1 completed" }));
     expect(screen.getByRole("link", { name: "Valid Palindrome" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "WRITE" }));
+    fireEvent.click(screen.getByRole("button", { name: "DO NOW" }));
     expect(screen.getByRole("heading", { name: "Valid Palindrome" })).toBeInTheDocument();
   });
 

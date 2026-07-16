@@ -5,6 +5,9 @@ export type Problem = {
   difficulty: "Easy" | "Medium" | "Hard";
   minutes: number;
   start_url: string;
+  why?: string;
+  done_when?: string;
+  starter?: string;
 };
 
 export type LegacyProgress = {
