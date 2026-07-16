@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api_attempts import router as attempts_router
 from .api_todos import router as todos_router
-from .legacy import PROJECT_ROOT
+from .legacy import PROJECT_ROOT, load_dashboard_snapshot
 from .repository import neetcode_snapshot
 
 
@@ -30,6 +30,11 @@ def health() -> dict[str, str | bool]:
 @app.get("/api/v1/neetcode")
 def neetcode() -> dict:
     return neetcode_snapshot()
+
+
+@app.get("/api/v1/dashboard")
+def dashboard() -> dict:
+    return load_dashboard_snapshot()
 
 
 @app.get("/{path:path}", include_in_schema=False)

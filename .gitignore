@@ -19,6 +19,7 @@ ENVIRONMENT_AND_API_KEYS.md
 
 # Generated dashboard and runtime artifacts
 today.html
+data/dashboard_snapshot.json
 event-plists/
 *.log
 *.err

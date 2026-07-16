@@ -1,99 +1,125 @@
-import type { NeetCodeSnapshot } from "../types";
-import { priorityResources, resourcesByCategory, type DashboardResource } from "../resources";
+import { useEffect, useMemo, useState } from "react";
 
-type Props = {
-  snapshot: NeetCodeSnapshot;
-  onOpenNeetCode: () => void;
-};
+import { loadTodos, saveTodo } from "../api";
+import { priorityResources } from "../resources";
+import type { DashboardLink, DashboardSnapshot, DigestItem, QuickAction, QuietLink } from "../types";
 
-export function HomePage({ snapshot, onOpenNeetCode }: Props) {
-  const nextProblem = snapshot.problems.find((problem) => !snapshot.progress[problem.key]?.completed);
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+type Props = { dashboard: DashboardSnapshot };
 
-  const renderResource = (resource: DashboardResource, compact = false) => (
-    <a
-      className={`resource-card accent-${resource.accent}${compact ? " compact" : ""}`}
-      href={resource.url}
-      key={resource.id}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      <span className="resource-mark" aria-hidden="true">{resource.mark}</span>
-      <span className="resource-copy"><b>{resource.title}</b><small>{resource.subtitle}</small></span>
-      <span className="resource-arrow" aria-hidden="true">↗</span>
-    </a>
-  );
+const markRules: Array<[string, string, string]> = [
+  ["linkedin.com", "in", "linkedin"], ["github.com", "GH", "github"],
+  ["youtube.com", "YT", "youtube"], ["leetcode.com", "LC", "leetcode"],
+  ["neetcode.io", "NC", "neetcode"], ["freecodecamp.org", "fC", "freecodecamp"],
+  ["notion.so", "N", "notion"], ["jobright.ai", "JR", "jobright"],
+  ["simplify.jobs", "S", "simplify"], ["mail.google.com", "M", "gmail"],
+  ["joinhandshake.com", "H", "handshake"], ["google.com", "G", "google"],
+];
+
+function identity(url: string) {
+  const match = markRules.find(([host]) => url.includes(host));
+  return match ? { mark: match[1], brand: match[2] } : { mark: "↗", brand: "default" };
+}
+
+function LinkIcon({ url }: { url: string }) {
+  const item = identity(url);
+  return <span className={`legacy-link-icon brand-${item.brand}`} aria-hidden="true">{item.mark}</span>;
+}
+
+function Pill({ item, className = "legacy-pill" }: { item: DashboardLink; className?: string }) {
+  return <a className={`${className} brand-${identity(item.url).brand}`} href={item.url} target="_blank" rel="noopener noreferrer"><LinkIcon url={item.url} /><span>{item.title}</span></a>;
+}
+
+export function HomePage({ dashboard }: Props) {
+  const [todoState, setTodoState] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    loadTodos().then((items) => setTodoState(Object.fromEntries(items.map((item) => [item.item_key, item.completed])))).catch(() => undefined);
+  }, []);
+
+  const quickActions = useMemo<QuickAction[]>(() => dashboard.quick_actions.length ? dashboard.quick_actions : priorityResources.map((resource) => ({
+    title: resource.title, subtitle: resource.subtitle, url: resource.url, kind: resource.accent === "red" ? "hot" : resource.accent,
+  })), [dashboard.quick_actions]);
+
+  const toggle = (key: string, source: string, title: string, initial: boolean) => {
+    const completed = !(todoState[key] ?? initial);
+    setTodoState((current) => ({ ...current, [key]: completed }));
+    saveTodo(key, { source, title, completed }).catch(() => {
+      setTodoState((current) => ({ ...current, [key]: !completed }));
+    });
+  };
+
+  const digest = (items: DigestItem[], source: string) => items.length ? items.map((item, index) => item.is_todo && item.key ? (
+    <li className="legacy-check-item" key={item.key}>
+      <label className="legacy-check-row">
+        <input type="checkbox" checked={todoState[item.key] ?? Boolean(item.checked)} onChange={() => toggle(item.key!, source, item.text, Boolean(item.checked))} />
+        <span>{item.text}</span>
+      </label>
+    </li>
+  ) : <li key={`${source}-${index}`}>{item.text}</li>) : <li>No current content found.</li>;
+
+  const quietLinks: QuietLink[] = dashboard.quiet_links;
 
   return (
-    <main>
-      <section className="hero panel">
-        <div className="hero-copy">
-          <p className="eyebrow">PERSONAL OPERATING SYSTEM // {today}</p>
-          <h1>DAILY<br /><span>CONTROL</span></h1>
-          <p>把今天真正要做的事情放到同一个控制台：刷题、投递、学习，一次只推进一件。</p>
-          <p className="hero-links"><a href="https://www.notion.so/35ea5189545c80cfa8c3c910e0265817?source=copy_link" target="_blank" rel="noopener noreferrer">NOTION / 变得更强 ↗</a></p>
+    <main className="legacy-home">
+      <section className="legacy-hero">
+        <div className="legacy-hero-copy">
+          <p className="legacy-eyebrow">Personal operating system // {dashboard.date || "TODAY"}</p>
+          <h1>Daily<br /><span>Control</span></h1>
+          <p className="legacy-hero-lede">把今天真正要做的事情放到同一个控制台：先完成 Calendar，再推进投递，最后沿着本周路线学习。</p>
+          <p className="legacy-hero-meta">Generated {dashboard.generated_at ? dashboard.generated_at.replace("T", " ").slice(0, 16) : "waiting for first sync"} · <a href="https://www.notion.so/35ea5189545c80cfa8c3c910e0265817?source=copy_link" target="_blank" rel="noopener noreferrer">Notion / 变得更强</a>{dashboard.weekly_plan.url && <> · <a href={dashboard.weekly_plan.url} target="_blank" rel="noopener noreferrer">{dashboard.weekly_plan.title}</a></>}</p>
         </div>
-        <div className="hero-readout">
-          <div className="metrics">
-            <article><b>{snapshot.summary.completed.toString().padStart(2, "0")}</b><span>NEETCODE DONE</span></article>
-            <article><b>{snapshot.summary.total.toString().padStart(3, "0")}</b><span>PROBLEM BANK</span></article>
-            <article><b>09</b><span>DAILY SYNC</span></article>
+        <div className="legacy-hero-readout">
+          <div className="legacy-metrics">
+            <div className="legacy-metric"><b>{dashboard.metrics.calendar_events.toString().padStart(2, "0")}</b><span>Calendar events</span></div>
+            <div className="legacy-metric"><b>{dashboard.metrics.notion_tasks.toString().padStart(2, "0")}</b><span>Notion tasks</span></div>
+            <div className="legacy-metric"><b>{dashboard.metrics.fresh_jobs.toString().padStart(2, "0")}</b><span>Fresh jobs</span></div>
           </div>
-          <div className="priority-strip">
-            <div><b>01 / SOLVE</b><span>NeetCode official order</span></div>
-            <div><b>02 / APPLY</b><span>New grad + internship</span></div>
-            <div><b>03 / LEARN</b><span>Current weekly plan</span></div>
-          </div>
+          <div className="legacy-priority"><div><b>01 / Ship</b><span>按 Calendar 做，不空刷网页</span></div><div><b>02 / Apply</b><span>2027 NG + internship / co-op</span></div><div><b>03 / Learn</b><span>NeetCode + current week plan</span></div></div>
+          <div className="legacy-status-row">{dashboard.source_status.map((source) => <span className={`legacy-status ${source.ok ? "ok" : "warn"}`} key={source.name}><i>{source.ok ? "●" : "△"}</i><b>{source.name}</b><small>{source.detail}</small></span>)}</div>
         </div>
       </section>
 
-      <section className="panel section-block quick-launch" id="quick-launch">
-        <div className="section-heading">
-          <div><p className="eyebrow">QUICK LAUNCH</p><h2>Start here / 高频入口</h2></div>
-          <span className="section-note">CLICK ONE THING AND ACT</span>
-        </div>
-        <div className="resource-grid priority-grid">{priorityResources.map((resource) => renderResource(resource))}</div>
-      </section>
+      <div className="legacy-page-grid">
+        <div className="legacy-main-column">
+          <section className="legacy-content-section" id="today" data-index="01 / TODAY">
+            <p className="legacy-section-tag">Execution queue</p><h2>Calendar / 今天该做什么</h2>
+            {dashboard.events.length ? dashboard.events.map((event) => <article className={`legacy-event${event.all_day ? " allday" : ""}`} key={event.key}>
+              <label className="legacy-check-row"><input type="checkbox" checked={todoState[event.key] ?? false} onChange={() => toggle(event.key, "calendar", event.title, false)} /><span><b>{event.start_time || "All day"}</b> · {event.title}</span></label>
+              <div className="legacy-meta">{event.calendar}</div>
+              {event.url ? <a className="legacy-btn" href={event.url} target="_blank" rel="noopener noreferrer"><LinkIcon url={event.url} />Open / 开始做</a> : <span className="legacy-no-link">No action link / 无跳转链接</span>}
+            </article>) : <p className="legacy-sub">No events today.</p>}
+          </section>
 
-      <div className="home-grid">
-        <section className="panel section-block next-action">
-          <p className="eyebrow">DO NOW / 刷题</p>
-          <h2>Next in official order</h2>
-          {nextProblem ? (
-            <button className="action-card" type="button" onClick={onOpenNeetCode}>
-              <span>NEETCODE 150</span>
-              <b>{nextProblem.title}</b>
-              <small>{nextProblem.topic} · open workspace →</small>
-            </button>
-          ) : <p>Problem bank is loading…</p>}
-        </section>
-        <section className="panel section-block" id="today-queue">
-          <p className="eyebrow">TODAY / 今日队列</p>
-          <h2>Todo & Calendar</h2>
-          <p className="muted-copy">Calendar 和 Notion 的实时快照会在同步切片接入；现阶段继续由旧版稳定页读取。</p>
-          <a className="text-link" href="https://calendar.google.com/calendar/u/0/r/day" target="_blank" rel="noopener noreferrer">OPEN GOOGLE CALENDAR ↗</a>
-        </section>
+          <section className="legacy-content-section" id="plan" data-index="02 / PLAN">
+            <p className="legacy-section-tag">Learning trajectory</p><h2>Notion Plan / 学习路线</h2>
+            {dashboard.weekly_plan.url && <p><a className="legacy-btn" href={dashboard.weekly_plan.url} target="_blank" rel="noopener noreferrer"><LinkIcon url={dashboard.weekly_plan.url} />Open current week: {dashboard.weekly_plan.title}</a></p>}
+            <div className="legacy-digest-grid"><div><h3>Current week checklist</h3><ul>{digest(dashboard.weekly, "notion")}</ul></div><div><h3>变得更强 top notes</h3><ul>{digest(dashboard.notion, "notion")}</ul></div></div>
+            <h3>Study links / 学习入口</h3><div className="legacy-pillbox">{dashboard.links.study.map((item) => <Pill item={item} key={item.url} />)}</div>
+          </section>
+
+          <section className="legacy-content-section" id="jobs" data-index="03 / JOBS">
+            <p className="legacy-section-tag">Opportunity radar</p><h2>Job Hunt / 投简历入口</h2>
+            <p className="legacy-callout"><b>{dashboard.target_copy}</b><br /><span>{dashboard.target_copy_cn}</span></p>
+            <h3>Open these first / 先打开这些</h3>
+            <div className="legacy-job-groups">{Object.entries(dashboard.job_groups).map(([group, items]) => items.length ? <div className="legacy-job-group" key={group}><h4>{group}</h4><div className="legacy-pillbox">{items.map((item) => <Pill className="legacy-job-pill" item={item} key={item.url} />)}</div></div> : null)}</div>
+            <h3>Fresh-ish openings scan / 最近岗位扫描</h3>
+            <ol className="legacy-feed">{dashboard.jobs.length ? dashboard.jobs.map((job) => <li key={job.link}><a href={job.link} target="_blank" rel="noopener noreferrer">{job.title}</a><p>{job.snippet}</p></li>) : <li>No job results from Brave today.</li>}</ol>
+          </section>
+
+          <section className="legacy-content-section" id="news" data-index="04 / SIGNAL">
+            <p className="legacy-section-tag">Industry signal</p><h2>Tech News / 科技圈速览</h2><p className="legacy-sub">Short scan only. 看标题即可，除非和 AI / jobs / full-stack 直接相关。</p>
+            <ol className="legacy-feed news">{dashboard.news.length ? dashboard.news.map((news) => <li key={news.link}><a href={news.link} target="_blank" rel="noopener noreferrer">{news.title}</a><p>{news.snippet}</p></li>) : <li>No Brave results.</li>}</ol>
+          </section>
+
+          <section className="legacy-content-section" id="links" data-index="05 / ARCHIVE">
+            <p className="legacy-section-tag">Utility archive</p><h2>Lower Priority / 低优先级链接</h2><p className="legacy-sub">需要时再打开。Jobs · Study · Infra · Billing · Ideas · Profile · Research。</p>
+            <div className="legacy-quiet-grid">{quietLinks.map((item) => <a className={`legacy-quiet-card ${item.kind} brand-${identity(item.url).brand}`} href={item.url} key={item.url} target="_blank" rel="noopener noreferrer"><LinkIcon url={item.url} /><em>{item.label}</em><b>{item.title}</b><span>{item.url}</span></a>)}</div>
+          </section>
+        </div>
+
+        <aside className="legacy-side"><p className="legacy-section-tag">Quick launch</p><h2>Start Here</h2><p className="legacy-side-copy">高频入口 / click one thing and act</p><div className="legacy-quick">{quickActions.map((item) => <a className={`legacy-bigbtn ${item.kind} brand-${identity(item.url).brand}`} href={item.url} key={`${item.title}-${item.url}`} target="_blank" rel="noopener noreferrer"><LinkIcon url={item.url} /><b>{item.title}</b><span>{item.subtitle}</span></a>)}</div></aside>
       </div>
-
-      <section className="panel section-block" id="job-resources">
-        <div className="section-heading"><div><p className="eyebrow">OPPORTUNITY RADAR</p><h2>Job hunt / 投递入口</h2></div><span className="section-note">2027 NG + INTERNSHIP / CO-OP</span></div>
-        <div className="resource-grid">{resourcesByCategory("jobs").map((resource) => renderResource(resource, true))}</div>
-      </section>
-
-      <section className="panel section-block" id="study-resources">
-        <div className="section-heading"><div><p className="eyebrow">LEARNING TRAJECTORY</p><h2>Study resources / 学习资源</h2></div><span className="section-note">USE WHEN BLOCKED</span></div>
-        <div className="resource-grid">{resourcesByCategory("study").map((resource) => renderResource(resource, true))}</div>
-      </section>
-
-      <section className="panel section-block compact-resources" id="utility-links">
-        <div className="section-heading"><div><p className="eyebrow">UTILITY ARCHIVE</p><h2>Profiles & tools / 备用入口</h2></div></div>
-        <div className="resource-grid">{[...resourcesByCategory("profile"), ...resourcesByCategory("tools")].map((resource) => renderResource(resource, true))}</div>
-      </section>
+      <div className="legacy-marquee" aria-hidden="true"><span>calendar synchronized / notion loaded / opportunity radar active / neetcode linked / ship one thing today / calendar synchronized / notion loaded / opportunity radar active / neetcode linked / ship one thing today /</span></div>
     </main>
   );
 }

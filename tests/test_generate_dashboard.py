@@ -194,6 +194,7 @@ class DashboardTests(unittest.TestCase):
                 event['url'] = str(dashboard.OUT)
                 dashboard.render([event], [], [], {'study': [], 'jobs': []}, [todo], [todo])
                 page = dashboard.OUT.read_text(encoding='utf-8')
+                snapshot = json.loads(dashboard.dashboard_snapshot_path().read_text(encoding='utf-8'))
                 self.assertFalse(dashboard.OUT.with_suffix('.html.tmp').exists())
             finally:
                 dashboard.OUT = old_out
@@ -260,6 +261,10 @@ class DashboardTests(unittest.TestCase):
         self.assertLess(page.index('id="links"'), page.index('id="history"'))
         self.assertLess(page.index('id="history"'), page.index('<footer class="marquee"'))
         self.assertNotIn('window.dashboardCompletionStore', page)
+        self.assertEqual(snapshot['events'][0]['title'], 'Focus block')
+        self.assertEqual(snapshot['events'][0]['key'], dashboard.stable_event_key(event))
+        self.assertEqual(snapshot['weekly'][0]['text'], 'Ship it')
+        self.assertEqual(len(snapshot['quick_actions']), 8)
 
     def test_theme_has_safe_effects_without_full_page_compositing(self):
         root = MODULE_PATH.parents[1]

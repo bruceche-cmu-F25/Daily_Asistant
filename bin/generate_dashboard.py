@@ -64,6 +64,41 @@ TARGET_COPY = 'Target: Dec 2026 grad → 2027 New Grad full-time + Winter/Spring
 TARGET_COPY_CN = '目标：26年12月毕业后，优先看 2027 New Grad 全职、Winter/Spring 2027 实习/Co-op，也看 Fall 2026 实习。'
 
 
+def dashboard_snapshot_path():
+    """Keep the structured snapshot beside the generated page's data directory."""
+    return OUT.parent / 'data' / 'dashboard_snapshot.json'
+
+
+def write_dashboard_snapshot(payload):
+    """Atomically persist the React snapshot, retaining good data on source failure."""
+    path = dashboard_snapshot_path()
+    previous = {}
+    try:
+        previous = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        pass
+
+    stale_sources = []
+    fallback_fields = {
+        'Calendar': ('events',),
+        'Notion': ('links', 'weekly', 'notion', 'weekly_plan'),
+        'Brave Search': ('jobs', 'news'),
+    }
+    for source, fields in fallback_fields.items():
+        if SOURCE_STATUS.get(source, {}).get('ok'):
+            continue
+        stale_sources.append(source)
+        for field in fields:
+            if field in previous:
+                payload[field] = previous[field]
+
+    payload['stale_sources'] = stale_sources
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix('.json.tmp')
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    os.replace(tmp, path)
+
+
 def set_status(source, ok, detail):
     """Keep a short, safe status message for the generated page."""
     SOURCE_STATUS[source] = {'ok': bool(ok), 'detail': short(str(detail), 90)}
@@ -703,6 +738,42 @@ def render(events, news, jobs, links, weekly, notion):
             f'{icon}<em>{esc(label)}</em><b>{esc(title)}</b><span class="link-url">{esc(url)}</span></a>'
         )
     now = dt.datetime.now(TZ).strftime('%Y-%m-%d %H:%M')
+
+    write_dashboard_snapshot({
+        'date': TODAY.isoformat(),
+        'generated_at': dt.datetime.now(TZ).isoformat(timespec='seconds'),
+        'weekly_plan': {'title': WEEKLY_PLAN_TITLE, 'url': WEEKLY_PLAN_URL},
+        'metrics': {
+            'calendar_events': len(events),
+            'notion_tasks': task_count,
+            'fresh_jobs': len(jobs),
+        },
+        'source_status': [
+            {
+                'name': source,
+                'ok': bool(SOURCE_STATUS.get(source, {}).get('ok')),
+                'detail': SOURCE_STATUS.get(source, {}).get('detail', 'Not checked'),
+            }
+            for source in ('Calendar', 'Notion', 'Brave Search')
+        ],
+        'events': [{**event, 'key': stable_event_key(event)} for event in events],
+        'links': links,
+        'weekly': weekly,
+        'notion': notion,
+        'jobs': jobs,
+        'news': news,
+        'job_groups': job_groups,
+        'quick_actions': [
+            {'title': title, 'subtitle': subtitle, 'url': url, 'kind': kind}
+            for title, subtitle, url, kind in quick_actions
+        ],
+        'quiet_links': [
+            {'title': title, 'url': url, 'kind': kind, 'label': label}
+            for title, url, kind, label in quiet_links
+        ],
+        'target_copy': TARGET_COPY,
+        'target_copy_cn': TARGET_COPY_CN,
+    })
 
     document = f'''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Daily Dashboard {TODAY}</title><link rel="icon" href="assets/todo-favicon.svg" type="image/svg+xml"><link rel="alternate icon" href="assets/todo-favicon.svg">
 <style>

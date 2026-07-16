@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
-import { loadNeetCode } from "./api";
+import { loadDashboard, loadNeetCode } from "./api";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
 import { NeetCodePage } from "./pages/NeetCodePage";
 import { dashboardResources, type DashboardResource } from "./resources";
-import type { NeetCodeSnapshot, Problem } from "./types";
+import type { DashboardSnapshot, NeetCodeSnapshot, Problem } from "./types";
 
 const emptySnapshot: NeetCodeSnapshot = {
   problems: [],
@@ -14,6 +14,26 @@ const emptySnapshot: NeetCodeSnapshot = {
   attempts: [],
   topics: [],
   summary: { completed: 0, total: 0, stuck: 0 },
+};
+
+const emptyDashboard: DashboardSnapshot = {
+  date: "",
+  generated_at: "",
+  weekly_plan: { title: "Road Map", url: "" },
+  metrics: { calendar_events: 0, notion_tasks: 0, fresh_jobs: 0 },
+  source_status: [],
+  stale_sources: ["Calendar", "Notion", "Brave Search"],
+  events: [],
+  links: { study: [], jobs: [] },
+  weekly: [],
+  notion: [],
+  jobs: [],
+  news: [],
+  job_groups: {},
+  quick_actions: [],
+  quiet_links: [],
+  target_copy: "",
+  target_copy_cn: "",
 };
 
 type SearchMatch =
@@ -31,9 +51,12 @@ const searchableSections = [
 
 export function App() {
   const [snapshot, setSnapshot] = useState(emptySnapshot);
+  const [dashboard, setDashboard] = useState(emptyDashboard);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [clock, setClock] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const refreshSnapshot = useCallback(() => {
     loadNeetCode().then(setSnapshot).catch((reason: unknown) => {
@@ -43,7 +66,17 @@ export function App() {
 
   useEffect(() => {
     refreshSnapshot();
+    loadDashboard().then(setDashboard).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : "Unable to load dashboard snapshot");
+    });
   }, [refreshSnapshot]);
+
+  useEffect(() => {
+    const update = () => setClock(new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Los_Angeles" }).format(new Date()));
+    update();
+    const timer = window.setInterval(update, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const matches = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -90,9 +123,12 @@ export function App() {
           <span>BRUCE / DAILY OS</span>
         </NavLink>
         <nav aria-label="Primary navigation">
-          <NavLink to="/">TODAY</NavLink>
+          <a href="/#today">TODAY</a>
+          <a href="/#plan">PLAN</a>
           <NavLink to="/neetcode">NEETCODE</NavLink>
-          <NavLink to="/discover">DISCOVER</NavLink>
+          <a href="/neetcode#history">HISTORY</a>
+          <a href="/#jobs">JOBS</a>
+          <NavLink to="/discover">SIGNAL</NavLink>
         </nav>
         <div className="global-search" role="search">
           <span aria-hidden="true">⌕</span>
@@ -126,17 +162,17 @@ export function App() {
             </div>
           )}
         </div>
-        <button className="sync-button" type="button" disabled title="Enabled in sync slice">
-          V2 PREVIEW
-        </button>
+        <div className={`sync-button${dashboard.stale_sources.length ? " stale" : ""}`}>
+          {dashboard.stale_sources.length ? "DEGRADED MODE" : "ALL SYSTEMS ONLINE"} · {clock}
+        </div>
       </header>
       {error && <div className="error-banner">{error}</div>}
       <Routes>
-        <Route path="/" element={<HomePage snapshot={snapshot} onOpenNeetCode={() => navigate("/neetcode")} />} />
+        <Route path="/" element={<HomePage dashboard={dashboard} />} />
         <Route path="/neetcode" element={<NeetCodePage snapshot={snapshot} onRefresh={refreshSnapshot} />} />
         <Route path="/discover" element={<DiscoverPage />} />
       </Routes>
-      <footer>LOCAL-FIRST / PARALLEL PREVIEW / PORT 8766</footer>
+      {location.pathname !== "/" && <footer>LOCAL-FIRST / PARALLEL PREVIEW / PORT 8766</footer>}
     </div>
   );
 }

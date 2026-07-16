@@ -56,3 +56,16 @@ def test_legacy_adapter_is_read_only_and_summarizes_progress(tmp_path):
     assert len(problems) == 2
     assert progress["leetcode:one"]["completed"] is True
     assert progress["leetcode:one"]["solution"] == "print('ok')"
+
+
+def test_dashboard_snapshot_adapter(tmp_path):
+    snapshot = tmp_path / "dashboard_snapshot.json"
+    snapshot.write_text(
+        '{"date":"2026-07-15","events":[{"key":"event:one","title":"Focus"}]}',
+        encoding="utf-8",
+    )
+
+    payload = legacy.load_dashboard_snapshot(snapshot)
+
+    assert payload["date"] == "2026-07-15"
+    assert payload["events"][0]["key"] == "event:one"
