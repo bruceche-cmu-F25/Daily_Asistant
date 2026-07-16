@@ -27,6 +27,19 @@ def test_health_endpoint():
     }
 
 
+def test_favicon_endpoint_returns_the_shared_svg():
+    async def request_favicon():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/todo-favicon.svg")
+
+    response = anyio.run(request_favicon)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/svg+xml")
+    assert b"<svg" in response.content
+
+
 def test_legacy_adapter_is_read_only_and_summarizes_progress(tmp_path):
     bank = tmp_path / "problem_bank.json"
     bank.write_text(

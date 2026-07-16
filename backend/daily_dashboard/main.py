@@ -37,6 +37,11 @@ def dashboard() -> dict:
     return load_dashboard_snapshot()
 
 
+@app.get("/todo-favicon.svg", include_in_schema=False)
+def favicon():
+    return FileResponse(FRONTEND_DIST / "todo-favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/{path:path}", include_in_schema=False)
 def react_app(path: str):
     index = FRONTEND_DIST / "index.html"
