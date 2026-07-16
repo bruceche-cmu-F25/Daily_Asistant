@@ -20,6 +20,14 @@ http://127.0.0.1:8766/
 
 新版当前包含 `/`、`/neetcode`、`/discover` 三条路由，并只读显示现有 NeetCode 150 与旧版刷题记录。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
 
+无损创建 v2 数据库并导入旧版刷题记录：
+
+```bash
+.venv/bin/python bin/migrate_v2.py
+```
+
+迁移会先把旧库备份到 `data/backups/`，再写入新的 `data/daily_v2.db`；重复执行不会重复导入 Attempt。
+
 ## 运行
 
 ```bash

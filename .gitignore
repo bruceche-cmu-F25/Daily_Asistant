@@ -34,3 +34,4 @@ frontend/vite.config.d.ts
 data/*.db
 data/*.db-shm
 data/*.db-wal
+data/backups/

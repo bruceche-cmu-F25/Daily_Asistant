@@ -1,13 +1,19 @@
 import sqlite3
 
-from fastapi.testclient import TestClient
+import anyio
+import httpx
 
 from daily_dashboard import legacy
 from daily_dashboard.main import app
 
 
 def test_health_endpoint():
-    response = TestClient(app).get("/api/v1/health")
+    async def request_health():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/v1/health")
+
+    response = anyio.run(request_health)
     assert response.status_code == 200
     assert response.json() == {
         "ok": True,

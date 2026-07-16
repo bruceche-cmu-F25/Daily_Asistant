@@ -6,7 +6,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .legacy import PROJECT_ROOT, neetcode_snapshot
+from .legacy import PROJECT_ROOT
+from .repository import neetcode_snapshot
 
 
 app = FastAPI(title="Daily Dashboard", version="2.0.0-dev")

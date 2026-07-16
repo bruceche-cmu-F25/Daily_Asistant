@@ -17,11 +17,12 @@ export type LegacyProgress = {
   reflection: string;
   completed_at: string | null;
   updated_at: string;
+  attempt_count?: number;
 };
 
 export type NeetCodeSnapshot = {
   problems: Problem[];
   progress: Record<string, LegacyProgress>;
   topics: Array<{ name: string; total: number; completed: number }>;
-  summary: { completed: number; total: number; stuck: number };
+  summary: { completed: number; total: number; stuck: number; attempts?: number };
 };
