@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 
@@ -17,12 +17,23 @@ vi.mock("./api", () => ({
   createAttempt: () => Promise.resolve({ ok: true, attempt: {} }),
 }));
 
+afterEach(cleanup);
+
 describe("App", () => {
   it("renders the local-first home shell", async () => {
     render(<MemoryRouter><App /></MemoryRouter>);
     expect(await screen.findByText("DAILY")).toBeInTheDocument();
     expect(await screen.findByText("Two Sum")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
+    expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
+    expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
+  });
+
+  it("finds migrated resources in global search", async () => {
+    render(<MemoryRouter><App /></MemoryRouter>);
+    const search = screen.getByRole("searchbox", { name: "Global search" });
+    fireEvent.change(search, { target: { value: "linkedin" } });
+    expect(await screen.findByText("Profile + job search")).toBeInTheDocument();
   });
 
   it("requires a solution before marking a problem solved", async () => {

@@ -5,6 +5,7 @@ import { loadNeetCode } from "./api";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
 import { NeetCodePage } from "./pages/NeetCodePage";
+import { dashboardResources, type DashboardResource } from "./resources";
 import type { NeetCodeSnapshot, Problem } from "./types";
 
 const emptySnapshot: NeetCodeSnapshot = {
@@ -14,6 +15,19 @@ const emptySnapshot: NeetCodeSnapshot = {
   topics: [],
   summary: { completed: 0, total: 0, stuck: 0 },
 };
+
+type SearchMatch =
+  | { kind: "problem"; problem: Problem }
+  | { kind: "resource"; resource: DashboardResource }
+  | { kind: "section"; title: string; subtitle: string; path: string };
+
+const searchableSections = [
+  { title: "Today", subtitle: "Todo, calendar and quick launch", path: "/#today-queue" },
+  { title: "NeetCode 150", subtitle: "Roadmap, workspace and history", path: "/neetcode" },
+  { title: "Job Hunt", subtitle: "Application platforms and curated lists", path: "/#job-resources" },
+  { title: "Study Resources", subtitle: "Courses and project-based learning", path: "/#study-resources" },
+  { title: "Discover", subtitle: "Tech news and events", path: "/discover" },
+];
 
 export function App() {
   const [snapshot, setSnapshot] = useState(emptySnapshot);
@@ -33,14 +47,38 @@ export function App() {
 
   const matches = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return [];
-    return snapshot.problems.filter((problem) =>
-      `${problem.title} ${problem.topic} ${problem.difficulty}`.toLowerCase().includes(normalized),
-    ).slice(0, 7);
+    if (!normalized) return [] as SearchMatch[];
+    const problems: SearchMatch[] = snapshot.problems
+      .filter((problem) => `${problem.title} ${problem.topic} ${problem.difficulty}`.toLowerCase().includes(normalized))
+      .slice(0, 5)
+      .map((problem) => ({ kind: "problem", problem }));
+    const resources: SearchMatch[] = dashboardResources
+      .filter((resource) => `${resource.title} ${resource.subtitle} ${resource.category}`.toLowerCase().includes(normalized))
+      .slice(0, 5)
+      .map((resource) => ({ kind: "resource", resource }));
+    const sections: SearchMatch[] = searchableSections
+      .filter((section) => `${section.title} ${section.subtitle}`.toLowerCase().includes(normalized))
+      .slice(0, 3)
+      .map((section) => ({ kind: "section", ...section }));
+    return [...resources, ...problems, ...sections].slice(0, 9);
   }, [query, snapshot.problems]);
 
   const openProblem = (problem: Problem) => {
     window.open(problem.start_url, "_blank", "noopener,noreferrer");
+    setQuery("");
+  };
+
+  const openMatch = (match: SearchMatch) => {
+    if (match.kind === "problem") {
+      openProblem(match.problem);
+      return;
+    }
+    if (match.kind === "resource") {
+      window.open(match.resource.url, "_blank", "noopener,noreferrer");
+      setQuery("");
+      return;
+    }
+    navigate(match.path);
     setQuery("");
   };
 
@@ -63,7 +101,7 @@ export function App() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && matches[0]) openProblem(matches[0]);
+              if (event.key === "Enter" && matches[0]) openMatch(matches[0]);
               if (event.key === "Escape") setQuery("");
             }}
             placeholder="Search problems and resources…"
@@ -71,11 +109,18 @@ export function App() {
           />
           {query && (
             <div className="search-results" role="listbox">
-              {matches.length ? matches.map((problem) => (
-                <button key={problem.key} type="button" onClick={() => openProblem(problem)}>
-                  <span className="result-mark">NC</span>
-                  <span><b>{problem.title}</b><small>NeetCode 150 · {problem.topic}</small></span>
-                  <span>↗</span>
+              {matches.length ? matches.map((match) => (
+                <button
+                  key={match.kind === "problem" ? match.problem.key : match.kind === "resource" ? match.resource.id : match.path}
+                  type="button"
+                  onClick={() => openMatch(match)}
+                >
+                  <span className="result-mark">{match.kind === "problem" ? "NC" : match.kind === "resource" ? match.resource.mark : "//"}</span>
+                  <span>
+                    <b>{match.kind === "problem" ? match.problem.title : match.kind === "resource" ? match.resource.title : match.title}</b>
+                    <small>{match.kind === "problem" ? `NeetCode 150 · ${match.problem.topic}` : match.kind === "resource" ? `Resource · ${match.resource.subtitle}` : `Section · ${match.subtitle}`}</small>
+                  </span>
+                  <span>{match.kind === "section" ? "→" : "↗"}</span>
                 </button>
               )) : <p>No matching local result.</p>}
             </div>
