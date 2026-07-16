@@ -23,3 +23,8 @@ event-plists/
 *.err
 *.out
 *.tmp
+
+# Local completion history
+data/*.db
+data/*.db-shm
+data/*.db-wal

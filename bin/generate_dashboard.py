@@ -9,6 +9,8 @@ import json
 import os
 import re
 import subprocess
+import sys
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -42,6 +44,8 @@ GMAIL = 'https://mail.google.com/mail/u/0/#inbox'
 SWE_INTERNS = 'https://github.com/SimplifyJobs/Summer2026-Internships'
 SWE_NEW_GRAD = 'https://github.com/SimplifyJobs/New-Grad-Positions'
 SPEEDY_AI = 'https://github.com/speedyapply/2026-AI-College-Jobs'
+SERVER_PORT = int(os.environ.get('DASHBOARD_PORT', '8765'))
+SERVER_URL = f'http://127.0.0.1:{SERVER_PORT}/today.html'
 
 DEFAULT_LINKS = {
     'leetcode': 'https://leetcode.com/problemset/',
@@ -536,6 +540,49 @@ def stable_event_key(event):
     return 'event:' + hashlib.sha256(identity.encode('utf-8')).hexdigest()[:20]
 
 
+def load_problem_bank():
+    """Load the explicit problem queue; unrelated dashboard tasks never enter it."""
+    path = BASE / 'data' / 'problem_bank.json'
+    try:
+        problems = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return []
+    required = {'key', 'title', 'topic', 'difficulty', 'minutes', 'start_url', 'why', 'done_when', 'starter'}
+    return [problem for problem in problems if isinstance(problem, dict) and required.issubset(problem)]
+
+
+def ensure_dashboard_server():
+    """Start the local persistence server if needed and return its URL."""
+    health_url = f'http://127.0.0.1:{SERVER_PORT}/api/health'
+    try:
+        with urllib.request.urlopen(health_url, timeout=0.35) as response:
+            if response.status == 200:
+                return SERVER_URL
+    except Exception:
+        pass
+    server_script = BASE / 'bin' / 'dashboard_server.py'
+    try:
+        subprocess.Popen(
+            [sys.executable, str(server_script), '--port', str(SERVER_PORT)],
+            cwd=str(BASE),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return str(OUT)
+    for _ in range(12):
+        time.sleep(0.1)
+        try:
+            with urllib.request.urlopen(health_url, timeout=0.25) as response:
+                if response.status == 200:
+                    return SERVER_URL
+        except Exception:
+            continue
+    return str(OUT)
+
+
 def render_digest(items):
     rendered = []
     for item in items:
@@ -613,6 +660,8 @@ def render(events, news, jobs, links, weekly, notion):
     jobs_html = ''.join(f'<li class="job">{visual_anchor("card-link", j.get("link"), short(j.get("title"), 98))}<p>{esc(short(j.get("snippet"), 118))}</p></li>' for j in jobs)
     news_html = ''.join(f'<li class="news">{visual_anchor("card-link", n.get("link"), short(n.get("title"), 92))}<p>{esc(short(n.get("snippet"), 95))}</p></li>' for n in news)
     source_status_html = render_source_status()
+    coach_tasks = load_problem_bank()
+    coach_tasks_json = json.dumps(coach_tasks, ensure_ascii=False).replace('</', '<\\/')
     quick_actions = [
         ('Gmail', 'Inbox / 邮件', GMAIL, 'hot'),
         ('LeetCode', '刷题 + 保持手感', 'https://leetcode.com/problemset/', 'blue'),
@@ -655,14 +704,18 @@ def render(events, news, jobs, links, weekly, notion):
         )
     now = dt.datetime.now(TZ).strftime('%Y-%m-%d %H:%M')
 
-    document = f'''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Daily Dashboard {TODAY}</title>
+    document = f'''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Daily Dashboard {TODAY}</title><link rel="icon" href="assets/todo-favicon.svg" type="image/svg+xml"><link rel="alternate icon" href="assets/todo-favicon.svg">
 <style>
 :root{{--bg:#f5efe4;--card:#fffaf1;--ink:#20262f;--muted:#6f766f;--navy:#071225;--navy2:#0d1b2f;--teal:#1f8a7a;--green:#2d7d4f;--red:#a9444b;--gold:#b08a2e;--line:#e3d7c4;--soft:#fbf6ed}}
 *{{box-sizing:border-box}}body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;max-width:1220px;margin:0 auto;padding:24px 22px 44px;background:var(--bg);color:var(--ink);line-height:1.48}}body:before{{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(135deg,rgba(7,18,37,.96),rgba(13,27,47,.92)),repeating-linear-gradient(45deg,transparent 0 58px,rgba(45,125,79,.38) 60px 66px,transparent 69px 126px),repeating-linear-gradient(-45deg,transparent 0 86px,rgba(169,68,75,.30) 88px 94px,transparent 96px 160px),repeating-linear-gradient(45deg,transparent 0 118px,rgba(31,138,122,.34) 120px 124px,transparent 128px 210px),repeating-linear-gradient(-45deg,transparent 0 150px,rgba(176,138,46,.28) 152px 157px,transparent 160px 240px);opacity:.92}}h1{{font-size:42px;margin:0 0 8px;letter-spacing:-.03em}}h2{{font-size:25px;margin:0 0 12px;letter-spacing:-.015em}}h3{{font-size:18px;margin:18px 0 8px}}section,.side{{background:rgba(255,250,241,.94);border:1px solid rgba(227,215,196,.9);border-radius:24px;padding:22px;margin:0 0 18px;box-shadow:0 18px 46px #0000001a;backdrop-filter:blur(10px)}}.hero{{background:rgba(7,18,37,.82);color:#fffaf1;border-color:rgba(255,255,255,.14);margin-bottom:18px}}.hero p{{color:#e9ddcb}}.sub{{color:var(--muted);margin:4px 0}}.status-row{{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}}.status-chip{{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;font-size:12px;background:#ffffff12;border:1px solid #ffffff24;color:#e9ddcb}}.status-chip i{{font-style:normal}}.status-chip.ok i{{color:#78d6a8}}.status-chip.warn i{{color:#f1b36a}}.page{{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}}.main{{min-width:0}}.side{{position:sticky;top:18px;padding:18px;background:rgba(255,250,241,.91)}}.side h2{{font-size:21px}}.grid{{display:grid;grid-template-columns:1.05fr .95fr;gap:18px}}.event{{padding:16px;border-radius:18px;background:#fff7e8;margin:12px 0;border:1px solid #ead9bd}}.check-row{{display:flex;gap:10px;align-items:flex-start;font-size:18px;cursor:pointer}}input[type=checkbox]{{width:20px;height:20px;flex:0 0 20px;margin-top:3px;accent-color:var(--green)}}input:checked+span{{text-decoration:line-through;color:#7b817a}}.check-item{{list-style:none;margin:8px 0}}.check-item .check-row{{font-size:16px}}.meta{{color:var(--muted);font-size:13px;margin:6px 0 10px}}.no-link{{display:inline-block;color:var(--muted);font-size:13px}}a{{color:#315f56;text-decoration:none}}a:hover{{text-decoration:underline}}a:focus-visible,input:focus-visible{{outline:3px solid #d1953f;outline-offset:3px}}.btn{{display:inline-block;background:#315f56;color:#fffaf1;padding:9px 13px;border-radius:12px;font-weight:750}}.btn:hover{{text-decoration:none;background:#254b44}}.pillbox{{display:flex;flex-wrap:wrap;gap:10px}}.pill{{display:inline-block;border:1px solid #d7c8b2;background:#fff4df;border-radius:999px;padding:9px 13px;font-weight:700;color:#315f56}}.pill.important{{background:#fff1ea;border-color:#e6b9aa;color:#8b3d34}}.job-link-group{{background:#fff8eb;border:1px solid #ead9bd;border-radius:18px;padding:14px;margin:12px 0}}.job-link-group h4{{font-size:15px;margin:0 0 10px;color:#6f4b31}}.job-link-row{{display:flex;flex-wrap:wrap;gap:9px}}.job-pill{{display:inline-block;border-radius:999px;padding:9px 12px;font-weight:750;background:#fff1ea;border:1px solid #e6b9aa;color:#8b3d34}}.job-link-group:nth-of-type(2) .job-pill{{background:#eef7ed;border-color:#c9dfc3;color:#2d5f3d}}.job-link-group:nth-of-type(3) .job-pill{{background:#eef3f8;border-color:#c8d6e2;color:#34547a}}.job-link-group:nth-of-type(4) .job-pill{{background:#f7eef3;border-color:#dfc8d5;color:#6e4159}}.job,.news{{list-style:none;padding:14px;border-radius:18px;margin:10px 0;background:#fff8eb;border:1px solid #ead9bd}}.job a{{font-size:19px;font-weight:850;color:#7e373b}}.news a{{font-size:18px;font-weight:800;color:#315f56}}.job p,.news p{{margin:6px 0 0;color:#5f655f}}.callout{{border-left:5px solid var(--gold);padding-left:14px;font-size:17px}}.cn{{font-weight:750}}ul.clean{{padding-left:20px}}.quick{{display:grid;grid-template-columns:1fr;gap:11px}}.quiet-grid{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}.quiet-card{{display:block;padding:12px 13px;border-radius:14px;background:#f7efe2;border:1px solid #e3d7c4;color:#59615b;position:relative;border-left-width:6px}}.quiet-card em{{display:inline-block;font-style:normal;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6f766f;background:#ffffff9c;border-radius:999px;padding:2px 7px;margin-bottom:7px}}.quiet-card b{{display:block;font-size:14px;color:#3f4842;margin-bottom:3px}}.quiet-card span{{display:block;font-size:11px;color:#7b817a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}.quiet-card:hover{{text-decoration:none;background:#fff4df}}.quiet-card.billing{{border-left-color:#b08a2e;background:#fbf1da}}.quiet-card.ideas{{border-left-color:#1f8a7a;background:#edf7f3}}.quiet-card.jobs{{border-left-color:#a9444b;background:#fff0eb}}.quiet-card.profile{{border-left-color:#34547a;background:#eef3f8}}.quiet-card.study{{border-left-color:#2d7d4f;background:#eef7ed}}.quiet-card.infra{{border-left-color:#59606b;background:#f1f2f2}}.quiet-card.research{{border-left-color:#7a4f61;background:#f7eef3}}.bigbtn{{min-height:82px;border-radius:18px;padding:14px 15px;color:#fffaf1;text-decoration:none;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 24px #00000014;transform:translateY(0);transition:.12s ease;border:1px solid #ffffff1f}}.bigbtn:hover{{text-decoration:none;transform:translateY(-1px);filter:brightness(1.03)}}.bigbtn b{{font-size:20px;line-height:1.05}}.bigbtn span{{font-size:13px;opacity:.9;margin-top:8px}}.bigbtn.hot{{background:linear-gradient(135deg,#8c343b,#bd6f43)}}.bigbtn.blue{{background:linear-gradient(135deg,#233b67,#2f7970)}}.bigbtn.green{{background:linear-gradient(135deg,#285b42,#5d7e42)}}.bigbtn.purple{{background:linear-gradient(135deg,#44345f,#7a4f61)}}.priority{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}}.priority div{{background:#ffffff12;border:1px solid #ffffff24;border-radius:16px;padding:14px}}.priority b{{display:block;font-size:17px;color:#fffaf1}}@media(max-width:960px){{.page{{grid-template-columns:1fr}}.side{{position:static;order:-1}}.quick{{grid-template-columns:1fr 1fr}}.priority,.grid{{grid-template-columns:1fr}}h1{{font-size:34px}}}}@media(max-width:640px){{body{{padding:12px 10px 30px}}section,.side{{border-radius:18px;padding:17px}}h1{{font-size:30px}}h2{{font-size:22px}}.quick,.quiet-grid{{grid-template-columns:1fr}}.status-chip{{max-width:100%}}}}@media(prefers-reduced-motion:reduce){{*{{scroll-behavior:auto!important;transition:none!important}}}}
 {theme_css}
 </style></head><body>
-<div class="retro-page"><header class="topbar"><div class="brand"><span class="brand-mark"></span><span>Bruce / Daily OS</span></div><nav class="topnav" aria-label="Dashboard sections"><button type="button" data-scroll-target="today">Today</button><button type="button" data-scroll-target="plan">Plan</button><button type="button" data-scroll-target="jobs">Jobs</button><button type="button" data-scroll-target="news">Signal</button><button type="button" data-scroll-target="links">Archive</button></nav><div class="link-search" role="search"><span class="search-glyph" aria-hidden="true">⌕</span><input id="link-search-input" type="search" placeholder="Search links…" aria-label="Search dashboard links" aria-controls="link-search-results" aria-expanded="false" autocomplete="off" spellcheck="false"><kbd>⌘K</kbd><div id="link-search-results" class="search-results" role="listbox" hidden></div></div><div class="sync-state"><span>{esc(sync_label)} · <b id="dashboard-clock">--:--</b></span></div></header>
+<div class="retro-page"><header class="topbar"><div class="brand"><span class="brand-mark"></span><span>Bruce / Daily OS</span></div><nav class="topnav" aria-label="Dashboard sections"><button type="button" data-scroll-target="today">Today</button><button type="button" data-scroll-target="plan">Plan</button><a href="https://neetcode.io/practice/practice/neetcode150" target="_blank" rel="noopener noreferrer">NeetCode ↗</a><button type="button" data-scroll-target="history">History</button><button type="button" data-scroll-target="jobs">Jobs</button><button type="button" data-scroll-target="news">Signal</button></nav><div class="link-search" role="search"><span class="search-glyph" aria-hidden="true">⌕</span><input id="link-search-input" type="search" placeholder="Search links or problems…" aria-label="Search dashboard links and NeetCode problems" aria-controls="link-search-results" aria-expanded="false" autocomplete="off" spellcheck="false"><kbd>⌘K</kbd><div id="link-search-results" class="search-results" role="listbox" hidden></div></div><div class="sync-state"><span>{esc(sync_label)} · <b id="dashboard-clock">--:--</b></span></div></header>
 <section class="hero"><div class="hero-copy"><p class="eyebrow">Personal operating system // {TODAY}</p><h1>Daily<br><span>Control</span></h1><p class="hero-lede">把今天真正要做的事情放到同一个控制台：先完成 Calendar，再推进投递，最后沿着本周路线学习。</p><p class="hero-meta">Generated {esc(now)} · <a href="{esc(NOTION_URL)}" target="_blank" rel="noopener noreferrer">Notion / 变得更强</a> · <a href="{esc(WEEKLY_PLAN_URL)}" target="_blank" rel="noopener noreferrer">{esc(WEEKLY_PLAN_TITLE)}</a></p></div><div class="hero-readout"><div class="metrics"><div class="metric"><b>{len(events):02d}</b><span>Calendar events</span></div><div class="metric"><b>{task_count:02d}</b><span>Notion tasks</span></div><div class="metric"><b>{len(jobs):02d}</b><span>Fresh jobs</span></div></div><div class="priority"><div><b>01 / Ship</b><span>按 Calendar 做，不空刷网页</span></div><div><b>02 / Apply</b><span>2027 NG + internship / co-op</span></div><div><b>03 / Learn</b><span>NeetCode + current week plan</span></div></div><div class="status-row" aria-label="Data source status">{source_status_html}</div></div></section>
+
+<section class="coach" id="coach" data-index="00 / NEETCODE 150"><div class="coach-head"><div><p class="section-tag">Problem coach</p><h2>Do Now / 现在刷这题</h2><p class="coach-intro">一次只做一道 NeetCode 150。完成后记录 solution 和心得，全部只保存在这台 Mac。</p></div><div class="coach-progress"><b id="coach-done-count">0</b><span>problems today</span></div></div><div class="time-budget" role="group" aria-label="Available problem-solving time"><span>我现在有</span><button type="button" data-minutes="15">15 min</button><button type="button" data-minutes="30" class="active">30 min</button><button type="button" data-minutes="45">45 min</button><button type="button" data-minutes="60">60 min</button></div><article class="coach-card" id="coach-card"><div class="coach-card-top"><span class="coach-source" id="coach-source">Topic</span><span class="coach-difficulty" id="coach-difficulty">Easy</span><span class="coach-duration" id="coach-duration">30 min</span></div><h3 id="coach-title">正在选择下一道题…</h3><p class="coach-why" id="coach-why"></p><div class="coach-contract"><span>DONE WHEN</span><p id="coach-done-when"></p></div><div class="coach-actions"><a class="coach-start" id="coach-start" href="#">Open problem / 开始刷题</a><button type="button" class="coach-stuck" id="coach-stuck" aria-expanded="false">不会做 / 卡住了</button><button type="button" class="coach-finish" id="coach-finish">完成并写心得</button><button type="button" class="coach-skip" id="coach-skip">换一题</button></div><div class="coach-help" id="coach-help" hidden><p class="coach-help-label">IF STUCK / 按顺序，不要立刻看答案</p><ol id="coach-help-steps"></ol><a id="coach-help-link" href="https://neetcode.io/practice/practice/neetcode150" target="_blank" rel="noopener noreferrer">打开 NeetCode 150 ↗</a></div></article><div class="coach-empty" id="coach-empty" hidden><b>NeetCode 150 已经全部完成。</b><span>去 History 复习旧题和心得。</span></div><div class="coach-next"><span>UP NEXT</span><ol id="coach-next-list"></ol></div><div class="roadmap" aria-labelledby="roadmap-title"><div class="roadmap-head"><div><p class="section-tag">All problems</p><h3 id="roadmap-title">NeetCode 150 / 路线图</h3></div><p>选择 Topic 查看完整题单；节点数字会随本地完成记录更新。</p></div><div class="roadmap-scroll"><div class="roadmap-canvas" id="roadmap-graph"><svg class="roadmap-edges" viewBox="0 0 1060 850" aria-hidden="true"><path d="M530 86 C530 104 330 102 330 120 M530 86 C530 104 730 102 730 120 M330 186 C330 205 140 201 140 220 M330 186 C330 205 350 201 350 220 M330 186 C330 205 690 201 690 220 M140 286 C140 306 530 300 530 320 M690 286 C690 306 530 300 530 320 M530 386 C530 406 130 400 130 420 M530 386 C530 406 340 400 340 420 M530 386 C530 406 760 400 760 420 M340 486 C340 515 110 515 110 550 M340 486 C340 515 300 515 300 550 M340 486 C340 515 490 515 490 550 M760 486 C760 515 680 515 680 550 M760 486 C760 515 870 515 870 550 M680 616 C680 641 670 641 670 670 M870 616 C870 641 670 641 670 670 M870 616 C870 641 880 641 880 670 M670 736 C670 758 780 750 780 770 M880 736 C880 758 780 750 780 770" /></svg><div id="roadmap-topic-nodes"></div></div></div><section class="roadmap-list-panel" aria-live="polite"><div class="roadmap-list-head"><div><span>SELECTED TOPIC</span><h4 id="roadmap-list-title">Arrays &amp; Hashing</h4></div><b id="roadmap-list-count">0 / 9</b></div><ol class="roadmap-problem-list" id="roadmap-problem-list"></ol></section></div><script id="coach-tasks" type="application/json">{coach_tasks_json}</script></section>
+
+<dialog class="problem-dialog" id="problem-complete-dialog" aria-labelledby="problem-dialog-title"><form id="problem-complete-form"><div class="problem-dialog-head"><div><p class="section-tag">Save attempt</p><h2 id="problem-dialog-title">完成题目</h2></div><button type="button" id="problem-dialog-close" aria-label="Close">×</button></div><label for="problem-solution">Solution / 你的解法</label><textarea id="problem-solution" rows="10" placeholder="贴代码、伪代码，或写关键步骤…" spellcheck="false"></textarea><label for="problem-reflection">Comment / 心得</label><textarea id="problem-reflection" rows="5" placeholder="哪里卡住？核心模式是什么？下次要注意什么？"></textarea><div class="problem-dialog-actions"><button type="button" id="problem-dialog-cancel">取消</button><button type="submit" id="problem-save-complete">保存并完成</button></div></form></dialog>
 
 <div class="page"><main class="main">
 <section id="today" data-index="01 / TODAY"><p class="section-tag">Execution queue</p><h2>Calendar / 今天该做什么</h2>{event_cards or '<p>No events today.</p>'}</section>
@@ -675,19 +728,55 @@ def render(events, news, jobs, links, weekly, notion):
 
 <section id="links" data-index="05 / ARCHIVE"><p class="section-tag">Utility archive</p><h2>Lower Priority / 低优先级链接</h2><p class="sub">需要时再打开。Jobs · Study · Infra · Billing · Ideas · Profile · Research。</p><div class="quiet-grid">{quiet_links_html}</div></section>
 </main><aside class="side"><p class="section-tag">Quick launch</p><h2>Start Here</h2><p class="side-copy">高频入口 / click one thing and act</p><div class="quick">{quick_actions_html}</div></aside></div>
+<section class="problem-history" id="history" data-index="HISTORY / 150"><div class="history-head"><div><p class="section-tag">Local problem database</p><h2>History / 刷题记录</h2><p>按 Topic 看 NeetCode 150 进度，展开每道题即可复习 solution 和心得。</p></div><div class="history-stats" aria-label="Problem history summary"><div><b id="history-completed">0</b><span>completed</span></div><div><b id="history-total">150</b><span>total</span></div><div><b id="history-stuck">0</b><span>stuck taps</span></div><div><b id="history-today">0</b><span>today</span></div></div></div><div class="history-topic-grid" id="history-topic-grid" aria-label="Progress by topic"></div><div class="problem-history-list" id="problem-history-list"></div><p class="problem-history-empty" id="problem-history-empty">还没有完成记录。完成第一道题后会出现在这里。</p></section>
 <footer class="marquee" aria-hidden="true"><span>calendar synchronized / notion loaded / opportunity radar active / neetcode linked / ship one thing today / calendar synchronized / notion loaded / opportunity radar active / neetcode linked / ship one thing today / </span></footer></div>
 
 <script>
-document.querySelectorAll('input[type=checkbox]').forEach(cb=>{{
-  const key='todo:'+cb.dataset.key;
+document.querySelectorAll('input[type=checkbox][data-key]').forEach(cb=>{{
   try {{
-    const saved=localStorage.getItem(key);
+    const saved=localStorage.getItem('todo:'+cb.dataset.key);
     cb.checked=saved===null ? cb.dataset.initial==='1' : saved==='1';
-    cb.addEventListener('change',()=>localStorage.setItem(key,cb.checked?'1':'0'));
-  }} catch (error) {{
-    cb.checked=cb.dataset.initial==='1';
-  }}
+    cb.addEventListener('change',()=>localStorage.setItem('todo:'+cb.dataset.key,cb.checked?'1':'0'));
+  }} catch (error) {{ cb.checked=cb.dataset.initial==='1'; }}
 }});
+window.dashboardProblemStore = (()=>{{
+  const endpoint=location.protocol==='http:' || location.protocol==='https:' ? '/api/problems' : 'http://127.0.0.1:8765/api/problems';
+  const state=new Map();
+  let latest={{items:{{}},today_count:0}};
+  try {{
+    JSON.parse(document.getElementById('coach-tasks')?.textContent || '[]').forEach(problem=>{{
+      state.set(problem.key,localStorage.getItem('problem:'+problem.key)==='1');
+    }});
+  }} catch (error) {{}}
+  const save=async(problem,status,notes={{}})=>{{
+    if (status==='completed' || status==='reopened') state.set(problem.key,status==='completed');
+    try {{ localStorage.setItem('problem:'+problem.key,state.get(problem.key)?'1':'0'); }} catch (error) {{}}
+    if (!endpoint) return {{ok:false,today_count:null}};
+    try {{
+      const response=await fetch(endpoint,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{problem_key:problem.key,status,title:problem.title,topic:problem.topic,url:problem.start_url,solution:notes.solution || '',reflection:notes.reflection || ''}})}});
+      if (!response.ok) return {{ok:false,today_count:null}};
+      const result=await response.json();
+      if (result.item) latest.items[problem.key]=result.item;
+      if (Number.isInteger(result.today_count)) latest.today_count=result.today_count;
+      return result;
+    }} catch (error) {{ return {{ok:false,today_count:null}}; }}
+  }};
+  const refresh=async()=>{{
+    if (!endpoint) return latest;
+    try {{
+      const response=await fetch(endpoint,{{cache:'no-store'}});
+      if (!response.ok) return latest;
+      const data=await response.json();
+      Object.entries(data.items || {{}}).forEach(([key,item])=>{{
+        state.set(key,Boolean(item.completed));
+      }});
+      latest=data;
+      return latest;
+    }} catch (error) {{ return latest; }}
+  }};
+  const ready=refresh();
+  return {{ready,save,refresh,isCompleted:(key)=>state.get(key)===true,getItem:(key)=>latest.items?.[key] || null}};
+}})();
 {theme_js}
 </script></body></html>'''
     tmp = OUT.with_suffix('.html.tmp')
@@ -709,7 +798,7 @@ def main(open_page=True, schedule_reminders=True):
     if schedule_reminders:
         schedule_events(events)
     if open_page:
-        subprocess.run(['open', str(OUT)], check=False)
+        subprocess.run(['open', ensure_dashboard_server()], check=False)
     print(OUT)
 
 

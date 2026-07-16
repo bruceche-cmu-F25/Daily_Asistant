@@ -14,6 +14,10 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / 'bin' / 'generate_dashboard.
 SPEC = importlib.util.spec_from_file_location('generate_dashboard', MODULE_PATH)
 dashboard = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(dashboard)
+SERVER_PATH = MODULE_PATH.parent / 'dashboard_server.py'
+SERVER_SPEC = importlib.util.spec_from_file_location('dashboard_server', SERVER_PATH)
+dashboard_server = importlib.util.module_from_spec(SERVER_SPEC)
+SERVER_SPEC.loader.exec_module(dashboard_server)
 
 
 class DashboardTests(unittest.TestCase):
@@ -76,6 +80,60 @@ class DashboardTests(unittest.TestCase):
         first = dashboard.stable_event_key(event)
         self.assertEqual(first, dashboard.stable_event_key(dict(event)))
         self.assertTrue(first.startswith('event:'))
+
+    def test_coach_queue_is_the_complete_neetcode_150(self):
+        problems = dashboard.load_problem_bank()
+
+        self.assertEqual(len(problems), 150)
+        self.assertEqual(problems[0]['key'], 'leetcode:contains-duplicate')
+        self.assertEqual(problems[0]['topic'], 'Arrays & Hashing')
+        self.assertIn('neetcode.io/problems/', problems[0]['start_url'])
+        self.assertTrue(all('list=neetcode150' in problem['start_url'] for problem in problems))
+        self.assertTrue(all(problem['key'].startswith('leetcode:') for problem in problems))
+        self.assertTrue(all('source' not in problem for problem in problems))
+        self.assertEqual(
+            {difficulty: sum(problem['difficulty'] == difficulty for problem in problems)
+             for difficulty in ('Easy', 'Medium', 'Hard')},
+            {'Easy': 28, 'Medium': 101, 'Hard': 21},
+        )
+        self.assertEqual(len({problem['topic'] for problem in problems}), 18)
+
+    def test_sqlite_problem_history_tracks_stuck_complete_and_reopen(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            connection = dashboard_server.connect_db(Path(tmpdir) / 'dashboard.db')
+            try:
+                dashboard_server.save_problem_progress(
+                    connection, 'leetcode:two-sum', 'stuck', 'Two Sum', 'Arrays & Hashing',
+                    'https://leetcode.com/problems/two-sum/',
+                )
+                stuck = dashboard_server.problem_state(connection)
+                self.assertFalse(stuck['items']['leetcode:two-sum']['completed'])
+                self.assertEqual(stuck['items']['leetcode:two-sum']['stuck_count'], 1)
+
+                dashboard_server.save_problem_progress(
+                    connection, 'leetcode:two-sum', 'completed', 'Two Sum', 'Arrays & Hashing',
+                    'https://leetcode.com/problems/two-sum/', 'def two_sum(): pass',
+                    'Remember the complement map.',
+                )
+                completed = dashboard_server.problem_state(connection)
+                self.assertTrue(completed['items']['leetcode:two-sum']['completed'])
+                self.assertEqual(completed['items']['leetcode:two-sum']['title'], 'Two Sum')
+                self.assertEqual(completed['items']['leetcode:two-sum']['solution'], 'def two_sum(): pass')
+                self.assertEqual(
+                    completed['items']['leetcode:two-sum']['reflection'],
+                    'Remember the complement map.',
+                )
+                self.assertEqual(completed['today_count'], 1)
+
+                dashboard_server.save_problem_progress(
+                    connection, 'leetcode:two-sum', 'reopened', 'Two Sum', 'Arrays & Hashing',
+                    'https://leetcode.com/problems/two-sum/',
+                )
+                reopened = dashboard_server.problem_state(connection)
+                self.assertFalse(reopened['items']['leetcode:two-sum']['completed'])
+                self.assertEqual(reopened['today_count'], 0)
+            finally:
+                connection.close()
 
     def test_brave_uses_json_api_without_pi_skill(self):
         payload = {
@@ -144,7 +202,7 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('data-key="notion:block-1" data-initial="1"', page)
         self.assertIn('Brave Search</b> Missing key', page)
         self.assertIn('No action link / 无跳转链接', page)
-        self.assertIn('localStorage.getItem(key)', page)
+        self.assertIn("localStorage.getItem('todo:'+cb.dataset.key)", page)
         self.assertIn('rel="noopener noreferrer"', page)
         self.assertNotIn('dashboard-shader', page)
         self.assertNotIn('class="crt-overlay"', page)
@@ -173,8 +231,35 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('repeat(auto-fit, minmax(220px, 1fr))', page)
         self.assertIn('id="link-search-input"', page)
         self.assertIn('id="link-search-results"', page)
-        self.assertIn('const linkIndex = Array.from', page)
+        self.assertIn('placeholder="Search links or problems…"', page)
+        self.assertIn('const problemIndex = (() => {', page)
+        self.assertIn('const linkIndex = [...problemIndex, ...savedLinkIndex]', page)
+        self.assertIn('NeetCode 150 · ${problem.topic}', page)
+        self.assertIn('entry.searchText.toLowerCase().includes(query)', page)
         self.assertIn('window.open(entry.url, "_blank", "noopener,noreferrer")', page)
+        self.assertIn('id="coach" data-index="00 / NEETCODE 150"', page)
+        self.assertIn('id="coach-tasks" type="application/json"', page)
+        self.assertIn('id="coach-finish"', page)
+        self.assertIn("'/api/problems'", page)
+        self.assertIn('window.dashboardProblemStore', page)
+        self.assertIn('完成并写心得', page)
+        self.assertIn('href="https://neetcode.io/practice/practice/neetcode150"', page)
+        self.assertIn('data-scroll-target="history"', page)
+        self.assertIn('id="problem-complete-dialog"', page)
+        self.assertIn('id="problem-solution"', page)
+        self.assertIn('id="problem-reflection"', page)
+        self.assertIn('id="history" data-index="HISTORY / 150"', page)
+        self.assertIn('id="history-topic-grid"', page)
+        self.assertIn('id="problem-history-list"', page)
+        self.assertIn('id="roadmap-graph"', page)
+        self.assertIn('class="roadmap-edges"', page)
+        self.assertIn('id="roadmap-topic-nodes"', page)
+        self.assertIn('id="roadmap-problem-list"', page)
+        self.assertIn('const roadmapPositions = {', page)
+        self.assertIn('"Arrays & Hashing": [440, 20]', page)
+        self.assertLess(page.index('id="links"'), page.index('id="history"'))
+        self.assertLess(page.index('id="history"'), page.index('<footer class="marquee"'))
+        self.assertNotIn('window.dashboardCompletionStore', page)
 
     def test_theme_has_safe_effects_without_full_page_compositing(self):
         root = MODULE_PATH.parents[1]
