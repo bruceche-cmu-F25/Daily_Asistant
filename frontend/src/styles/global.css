@@ -22,7 +22,7 @@ body::before { display: none; }
 button, input { font: inherit; }
 a { color: inherit; text-decoration: none; }
 
-.app-shell { width: min(1480px, calc(100% - 32px)); min-height: calc(100vh - 40px); margin: 20px auto 38px; border: 1px solid var(--line); border-radius: 30px / 20px; overflow: hidden; background: rgba(0,5,3,.82); box-shadow: 0 24px 80px rgba(0,0,0,.4),0 0 0 7px rgba(3,8,7,.6),inset 0 0 95px rgba(0,0,0,.38); }
+.app-shell { width: min(1480px, calc(100% - 32px)); min-height: calc(100vh - 40px); margin: 20px auto 38px; border: 1px solid var(--line); border-radius: 30px / 20px; overflow: clip; background: rgba(0,5,3,.82); box-shadow: 0 24px 80px rgba(0,0,0,.4),0 0 0 7px rgba(3,8,7,.6),inset 0 0 95px rgba(0,0,0,.38); }
 .topbar { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: auto minmax(260px, 1fr) minmax(210px, 300px) auto; align-items: center; gap: 24px; min-height: 60px; padding: 0 20px; border-bottom: 1px solid var(--line); background: rgba(2,7,6,.92); }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--green); font-weight: 800; font-size: 13px; }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--green); }
