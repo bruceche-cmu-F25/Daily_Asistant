@@ -76,6 +76,7 @@ def neetcode_snapshot() -> dict[str, Any]:
     return {
         "problems": problems,
         "progress": progress,
+        "attempts": [],
         "topics": [{"name": name, **counts} for name, counts in topics.items()],
         "summary": {
             "completed": completed,

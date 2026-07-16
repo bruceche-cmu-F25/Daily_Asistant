@@ -68,6 +68,20 @@ def neetcode_snapshot(
     return {
         "problems": problems,
         "progress": progress,
+        "attempts": [
+            {
+                "id": attempt.id,
+                "problem_key": attempt.problem_key,
+                "status": attempt.status,
+                "language": attempt.language,
+                "solution": attempt.solution,
+                "reflection": attempt.reflection,
+                "source": attempt.source,
+                "created_at": attempt.created_at,
+                "updated_at": attempt.updated_at,
+            }
+            for attempt in attempts
+        ],
         "topics": [{"name": name, **counts} for name, counts in topics.items()],
         "summary": {
             "completed": sum(int(item["completed"]) for item in progress.values()),

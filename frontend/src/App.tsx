@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 
 import { loadNeetCode } from "./api";
@@ -10,6 +10,7 @@ import type { NeetCodeSnapshot, Problem } from "./types";
 const emptySnapshot: NeetCodeSnapshot = {
   problems: [],
   progress: {},
+  attempts: [],
   topics: [],
   summary: { completed: 0, total: 0, stuck: 0 },
 };
@@ -20,11 +21,15 @@ export function App() {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const refreshSnapshot = useCallback(() => {
     loadNeetCode().then(setSnapshot).catch((reason: unknown) => {
       setError(reason instanceof Error ? reason.message : "Unable to load local data");
     });
   }, []);
+
+  useEffect(() => {
+    refreshSnapshot();
+  }, [refreshSnapshot]);
 
   const matches = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -77,16 +82,16 @@ export function App() {
           )}
         </div>
         <button className="sync-button" type="button" disabled title="Enabled in sync slice">
-          READ ONLY
+          V2 PREVIEW
         </button>
       </header>
       {error && <div className="error-banner">{error}</div>}
       <Routes>
         <Route path="/" element={<HomePage snapshot={snapshot} onOpenNeetCode={() => navigate("/neetcode")} />} />
-        <Route path="/neetcode" element={<NeetCodePage snapshot={snapshot} />} />
+        <Route path="/neetcode" element={<NeetCodePage snapshot={snapshot} onRefresh={refreshSnapshot} />} />
         <Route path="/discover" element={<DiscoverPage />} />
       </Routes>
-      <footer>LOCAL-FIRST / READ-ONLY MIGRATION BUILD / PORT 8766</footer>
+      <footer>LOCAL-FIRST / PARALLEL PREVIEW / PORT 8766</footer>
     </div>
   );
 }

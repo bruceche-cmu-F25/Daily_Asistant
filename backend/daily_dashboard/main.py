@@ -6,11 +6,15 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api_attempts import router as attempts_router
+from .api_todos import router as todos_router
 from .legacy import PROJECT_ROOT
 from .repository import neetcode_snapshot
 
 
 app = FastAPI(title="Daily Dashboard", version="2.0.0-dev")
+app.include_router(attempts_router)
+app.include_router(todos_router)
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 ASSETS_DIR = FRONTEND_DIST / "assets"
 
@@ -20,7 +24,7 @@ if ASSETS_DIR.is_dir():
 
 @app.get("/api/v1/health")
 def health() -> dict[str, str | bool]:
-    return {"ok": True, "version": app.version, "mode": "read-only-migration"}
+    return {"ok": True, "version": app.version, "mode": "parallel-preview"}
 
 
 @app.get("/api/v1/neetcode")

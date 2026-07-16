@@ -18,7 +18,7 @@ def test_health_endpoint():
     assert response.json() == {
         "ok": True,
         "version": "2.0.0-dev",
-        "mode": "read-only-migration",
+        "mode": "parallel-preview",
     }
 
 

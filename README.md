@@ -4,7 +4,7 @@
 
 ## React + FastAPI v2 preview
 
-`codex/react-fastapi-refactor` 分支正在以只读方式并行开发新版，本地端口为 `8766`；旧版 `8765` 和现有 SQLite 数据不会被修改。
+`codex/react-fastapi-refactor` 分支正在并行开发新版，本地端口为 `8766`；旧版 `8765` 和旧 SQLite 数据库不会被修改。新版交互只写入独立的 `data/daily_v2.db`。
 
 ```bash
 uv sync
@@ -18,7 +18,7 @@ cd frontend && npm install && npm run build && cd ..
 http://127.0.0.1:8766/
 ```
 
-新版当前包含 `/`、`/neetcode`、`/discover` 三条路由，并只读显示现有 NeetCode 150 与旧版刷题记录。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
+新版当前包含 `/`、`/neetcode`、`/discover` 三条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt 和本地 Todo 状态 API。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
 
 无损创建 v2 数据库并导入旧版刷题记录：
 
