@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+.venv/
 
 # Local credentials and environment files
 .env
@@ -18,13 +19,20 @@ ENVIRONMENT_AND_API_KEYS.md
 
 # Generated dashboard and runtime artifacts
 today.html
+data/dashboard_snapshot.json
 event-plists/
 *.log
 *.err
 *.out
 *.tmp
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # Local completion history
 data/*.db
 data/*.db-shm
 data/*.db-wal
+data/backups/

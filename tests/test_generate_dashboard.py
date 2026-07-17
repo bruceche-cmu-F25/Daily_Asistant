@@ -159,6 +159,42 @@ class DashboardTests(unittest.TestCase):
         )
         self.assertTrue(dashboard.SOURCE_STATUS['Brave Search']['ok'])
 
+    def test_discover_events_tags_sources_and_deduplicates_links(self):
+        results = [
+            {'title': 'AI Builders', 'link': 'https://luma.com/ai-builders', 'snippet': 'Mountain View, Silicon Valley'},
+            {'title': 'Duplicate', 'link': 'https://luma.com/ai-builders', 'snippet': 'Same event'},
+            {'title': 'CMU-SV Seminar', 'link': 'https://events.cmu.edu/sv/event/seminar', 'snippet': 'Moffett Field'},
+            {'title': 'Claude Builder Night', 'link': 'https://www.anthropic.com/events/builder', 'snippet': 'San Francisco'},
+        ]
+
+        with mock.patch.object(dashboard, 'brave', return_value=results):
+            events = dashboard.discover_events()
+
+        self.assertEqual([event['source'] for event in events], ['Luma', 'CMU-SV', 'Anthropic'])
+        self.assertEqual(len(events), 3)
+        self.assertTrue(all(event['link'].startswith('https://') for event in events))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'AI Events in New York City', 'snippet': 'In-person NYC event'},
+            'Community',
+        ))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'Pittsburgh AI Builders', 'snippet': 'Carnegie Mellon main campus'},
+            'CMU',
+        ))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'Google Cloud Next 2025', 'snippet': 'Watch the sessions'},
+            'Anthropic',
+        ))
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': 'NVIDIA AI Software News', 'snippet': 'Announced at GTC San Jose', 'link': 'https://nvidia.com/blog/news'},
+            'NVIDIA',
+        ))
+        past_date = dashboard.TODAY - dashboard.dt.timedelta(days=1)
+        self.assertFalse(dashboard.discover_event_is_relevant(
+            {'title': f'AI Night — San Francisco, {past_date.strftime("%B %-d, %Y")}', 'snippet': 'A startup event', 'link': 'https://example.com/event'},
+            'Community',
+        ))
+
     def test_subprocess_failure_is_visible_in_status(self):
         with mock.patch.object(
             dashboard.subprocess,
@@ -194,6 +230,7 @@ class DashboardTests(unittest.TestCase):
                 event['url'] = str(dashboard.OUT)
                 dashboard.render([event], [], [], {'study': [], 'jobs': []}, [todo], [todo])
                 page = dashboard.OUT.read_text(encoding='utf-8')
+                snapshot = json.loads(dashboard.dashboard_snapshot_path().read_text(encoding='utf-8'))
                 self.assertFalse(dashboard.OUT.with_suffix('.html.tmp').exists())
             finally:
                 dashboard.OUT = old_out
@@ -260,6 +297,10 @@ class DashboardTests(unittest.TestCase):
         self.assertLess(page.index('id="links"'), page.index('id="history"'))
         self.assertLess(page.index('id="history"'), page.index('<footer class="marquee"'))
         self.assertNotIn('window.dashboardCompletionStore', page)
+        self.assertEqual(snapshot['events'][0]['title'], 'Focus block')
+        self.assertEqual(snapshot['events'][0]['key'], dashboard.stable_event_key(event))
+        self.assertEqual(snapshot['weekly'][0]['text'], 'Ship it')
+        self.assertEqual(len(snapshot['quick_actions']), 8)
 
     def test_theme_has_safe_effects_without_full_page_compositing(self):
         root = MODULE_PATH.parents[1]
@@ -298,11 +339,21 @@ class DashboardTests(unittest.TestCase):
             bin_dir.mkdir()
             fake_generator = bin_dir / 'generate_dashboard.py'
             fake_generator.write_text(
-                '#!/bin/zsh\nprint -r -- "$DASHBOARD_HOME/today.html"\n',
+                '#!/bin/zsh\nprint -r -- "$*" > "$DASHBOARD_HOME/generator-args.txt"\n',
                 encoding='utf-8',
             )
             fake_generator.chmod(0o755)
-            env = dict(os.environ, DASHBOARD_HOME=str(base))
+            fake_open = bin_dir / 'fake_open'
+            fake_open.write_text(
+                '#!/bin/zsh\nprint -r -- "$*" > "$DASHBOARD_HOME/opened-url.txt"\n',
+                encoding='utf-8',
+            )
+            fake_open.chmod(0o755)
+            env = dict(
+                os.environ,
+                DASHBOARD_HOME=str(base),
+                DASHBOARD_OPEN_BIN=str(fake_open),
+            )
             result = subprocess.run(
                 ['zsh', str(run_daily)],
                 text=True,
@@ -310,9 +361,13 @@ class DashboardTests(unittest.TestCase):
                 env=env,
                 check=False,
             )
+            generator_args = (base / 'generator-args.txt').read_text(encoding='utf-8').strip()
+            opened_url = (base / 'opened-url.txt').read_text(encoding='utf-8').strip()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), f'Dashboard updated: {base}/today.html')
+        self.assertEqual(generator_args, '--no-open')
+        self.assertEqual(opened_url, 'http://127.0.0.1:8766/')
 
 
 if __name__ == '__main__':

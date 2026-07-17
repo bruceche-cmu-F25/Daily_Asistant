@@ -2,6 +2,32 @@
 
 每天从 Google Calendar、Notion 和 Brave Search 汇总信息，生成本地页面 `today.html`。页面顶部的教练模式只负责算法刷题：每次推荐一道具体题，并提供完成标准和卡住时的帮助路径。
 
+## React + FastAPI v2 preview
+
+`codex/react-fastapi-refactor` 分支正在并行开发新版，本地端口为 `8766`；旧版 `8765` 和旧 SQLite 数据库不会被修改。新版交互只写入独立的 `data/daily_v2.db`。
+
+```bash
+uv sync
+cd frontend && npm install && npm run build && cd ..
+./bin/run_v2_dev.sh
+```
+
+然后打开：
+
+```text
+http://127.0.0.1:8766/
+```
+
+新版当前包含 `/`、`/learn`、`/neetcode`、`/discover` 四条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt 和本地 Todo 状态 API。`/learn` 以 freeCodeCamp JavaScript V9 和 Front End Development Libraries V9 为课程主线，保留官方 JavaScript 视频及 Advanced TypeScript 播放列表，并加入 FastAPI、pytest、Python Packaging、Cosmic Python、CI 和项目式学习入口；只在这台 Mac 的浏览器保存完成次数。`/discover` 是只读湾区活动雷达：每天从 Brave 搜索 Luma、CMU Silicon Valley 和大厂在 Bay Area 的活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
+
+无损创建 v2 数据库并导入旧版刷题记录：
+
+```bash
+.venv/bin/python bin/migrate_v2.py
+```
+
+迁移会先把旧库备份到 `data/backups/`，再写入新的 `data/daily_v2.db`；重复执行不会重复导入 Attempt。
+
 ## 运行
 
 ```bash
@@ -87,6 +113,6 @@ Retro shader 主题分别维护在：
 
 ## 自动运行
 
-`~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 每天调用 `bin/run_daily.sh`。生成器会先写临时文件，再原子替换 `today.html`，避免中断时留下不完整页面。
+`~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 每天 09:00 调用 `bin/run_daily.sh`。脚本刷新数据后会打开新版主页 `http://127.0.0.1:8766/`；生成器会先写临时文件，再原子替换 `today.html`，避免中断时留下不完整页面。
 
 页面顶部会显示 Calendar、Notion、Brave Search 三个数据源的生成状态。`pi-web.log` 和 `pi-web.err` 是旧版本遗留文件，当前流程不再启动 pi-web。

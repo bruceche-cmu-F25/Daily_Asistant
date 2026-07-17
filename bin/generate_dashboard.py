@@ -64,6 +64,41 @@ TARGET_COPY = 'Target: Dec 2026 grad → 2027 New Grad full-time + Winter/Spring
 TARGET_COPY_CN = '目标：26年12月毕业后，优先看 2027 New Grad 全职、Winter/Spring 2027 实习/Co-op，也看 Fall 2026 实习。'
 
 
+def dashboard_snapshot_path():
+    """Keep the structured snapshot beside the generated page's data directory."""
+    return OUT.parent / 'data' / 'dashboard_snapshot.json'
+
+
+def write_dashboard_snapshot(payload):
+    """Atomically persist the React snapshot, retaining good data on source failure."""
+    path = dashboard_snapshot_path()
+    previous = {}
+    try:
+        previous = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        pass
+
+    stale_sources = []
+    fallback_fields = {
+        'Calendar': ('events',),
+        'Notion': ('links', 'weekly', 'notion', 'weekly_plan'),
+        'Brave Search': ('jobs', 'news', 'discover_events'),
+    }
+    for source, fields in fallback_fields.items():
+        if SOURCE_STATUS.get(source, {}).get('ok'):
+            continue
+        stale_sources.append(source)
+        for field in fields:
+            if field in previous:
+                payload[field] = previous[field]
+
+    payload['stale_sources'] = stale_sources
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix('.json.tmp')
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    os.replace(tmp, path)
+
+
 def set_status(source, ok, detail):
     """Keep a short, safe status message for the generated page."""
     SOURCE_STATUS[source] = {'ok': bool(ok), 'detail': short(str(detail), 90)}
@@ -176,6 +211,113 @@ def brave(query, n=6, freshness='pd', timeout=45):
 
 def tech_news():
     return brave('biggest technology news today AI software chips big tech startups', 5, 'pd')
+
+
+def discover_event_source(url):
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.netloc.lower()
+    if 'luma.com' in host:
+        return 'Luma'
+    if host.endswith('cmu.edu') and ('/sv/' in parsed.path.lower() or host.startswith('sv.')):
+        return 'CMU-SV'
+    if host.endswith('cmu.edu'):
+        return 'CMU'
+    if 'anthropic.com' in host:
+        return 'Anthropic'
+    if 'microsoft.com' in host:
+        return 'Microsoft'
+    if 'google.com' in host:
+        return 'Google'
+    if 'amazon.com' in host or 'aws.' in host:
+        return 'AWS'
+    if 'nvidia.com' in host:
+        return 'NVIDIA'
+    if 'apple.com' in host:
+        return 'Apple'
+    return 'Community'
+
+
+def discover_event_is_bay_area(text):
+    """Require an explicit Bay Area location instead of guessing from the source."""
+    locations = (
+        'bay area', 'silicon valley', 'san francisco', 'south bay', 'peninsula',
+        'mountain view', 'sunnyvale', 'santa clara', 'san jose', 'san josé',
+        'palo alto', 'redwood city', 'menlo park', 'cupertino', 'moffett field',
+        'san mateo', 'foster city', 'fremont', 'oakland', 'berkeley',
+    )
+    return any(location in text for location in locations) or bool(re.search(r'\bSF\b', text, re.IGNORECASE))
+
+
+def discover_event_is_relevant(item, source):
+    title = html.unescape(item.get('title', ''))
+    text = f"{title} {html.unescape(item.get('snippet', ''))}".lower()
+    link = item.get('link', '').lower()
+    if any(term in text for term in ('applications are now closed', 'event has ended', 'past event', 'watch sessions')):
+        return False
+    if any(term in text for term in ('pittsburgh', 'pgh')):
+        return False
+    if source == 'CMU' and any(term in text for term in ('calendar search', 'calendar feed')):
+        return False
+    if not discover_event_is_bay_area(text):
+        return False
+    company_sources = {'Anthropic', 'Microsoft', 'Google', 'AWS', 'NVIDIA', 'Apple'}
+    event_signals = ('event', 'meetup', 'summit', 'conference', 'workshop', 'webinar', 'hackathon', 'session', 'developer day', 'gtc')
+    if source in company_sources and not any(signal in title.lower() or signal in link for signal in event_signals):
+        return False
+    years = [int(year) for year in re.findall(r'\b(20\d{2})\b', text)]
+    if years and max(years) < TODAY.year:
+        return False
+    month_names = {
+        name.lower(): index for index, name in enumerate(
+            ('January', 'February', 'March', 'April', 'May', 'June',
+             'July', 'August', 'September', 'October', 'November', 'December'),
+            start=1,
+        )
+    }
+    if 'week of' not in title.lower():
+        dated_title = re.search(
+            r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:,\s*(20\d{2}))?',
+            title,
+            re.IGNORECASE,
+        )
+        if dated_title:
+            month_name, day, year = dated_title.groups()
+            event_date = dt.date(int(year or TODAY.year), month_names[month_name.lower()], int(day))
+            if event_date < TODAY:
+                return False
+    for month_name, year in re.findall(
+        r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\b[^\n]{0,20}\b(20\d{2})\b',
+        text,
+    ):
+        event_month = dt.date(int(year), month_names[month_name], 1)
+        if event_month < TODAY.replace(day=1):
+            return False
+    return True
+
+
+def discover_events():
+    """Find Bay Area event candidates; the UI is read-only and links to sources."""
+    queries = [
+        f'San Francisco Bay Area Silicon Valley AI developer startup events Luma {TODAY.strftime("%B %Y")}',
+        f'site:events.cmu.edu/sv OR site:sv.cmu.edu events career AI Silicon Valley {TODAY.strftime("%B %Y")}',
+        f'site:anthropic.com/events OR site:developer.microsoft.com/reactor OR site:developer.apple.com/events "San Francisco" developer AI {TODAY.strftime("%B %Y")}',
+        f'site:developers.google.com OR site:nvidia.com events "Silicon Valley" OR "San Jose" OR "San Francisco" {TODAY.strftime("%B %Y")}',
+    ]
+    seen, found = set(), []
+    for query in queries:
+        for item in brave(query, 5, 'pm', timeout=35):
+            link = item.get('link', '').strip()
+            title = item.get('title', '').strip()
+            if not link.startswith('https://') or not title or link in seen:
+                continue
+            source = discover_event_source(link)
+            if not discover_event_is_relevant(item, source):
+                continue
+            seen.add(link)
+            found.append({**item, 'source': source})
+            if len(found) >= 12:
+                return found
+    return found
 
 
 def job_posts():
@@ -618,7 +760,8 @@ def event_action_html(event):
     return visual_anchor('btn', event.get('url'), 'Open / 开始做')
 
 
-def render(events, news, jobs, links, weekly, notion):
+def render(events, news, jobs, links, weekly, notion, discovered_events=None):
+    discovered_events = discovered_events or []
     theme_css = (ASSET_DIR / 'dashboard-retro.css').read_text(encoding='utf-8')
     theme_js = (ASSET_DIR / 'dashboard-retro.js').read_text(encoding='utf-8')
     task_count = sum(1 for item in weekly + notion if item.get('is_todo'))
@@ -703,6 +846,43 @@ def render(events, news, jobs, links, weekly, notion):
             f'{icon}<em>{esc(label)}</em><b>{esc(title)}</b><span class="link-url">{esc(url)}</span></a>'
         )
     now = dt.datetime.now(TZ).strftime('%Y-%m-%d %H:%M')
+
+    write_dashboard_snapshot({
+        'date': TODAY.isoformat(),
+        'generated_at': dt.datetime.now(TZ).isoformat(timespec='seconds'),
+        'weekly_plan': {'title': WEEKLY_PLAN_TITLE, 'url': WEEKLY_PLAN_URL},
+        'metrics': {
+            'calendar_events': len(events),
+            'notion_tasks': task_count,
+            'fresh_jobs': len(jobs),
+        },
+        'source_status': [
+            {
+                'name': source,
+                'ok': bool(SOURCE_STATUS.get(source, {}).get('ok')),
+                'detail': SOURCE_STATUS.get(source, {}).get('detail', 'Not checked'),
+            }
+            for source in ('Calendar', 'Notion', 'Brave Search')
+        ],
+        'events': [{**event, 'key': stable_event_key(event)} for event in events],
+        'links': links,
+        'weekly': weekly,
+        'notion': notion,
+        'jobs': jobs,
+        'news': news,
+        'discover_events': discovered_events,
+        'job_groups': job_groups,
+        'quick_actions': [
+            {'title': title, 'subtitle': subtitle, 'url': url, 'kind': kind}
+            for title, subtitle, url, kind in quick_actions
+        ],
+        'quiet_links': [
+            {'title': title, 'url': url, 'kind': kind, 'label': label}
+            for title, url, kind, label in quiet_links
+        ],
+        'target_copy': TARGET_COPY,
+        'target_copy_cn': TARGET_COPY_CN,
+    })
 
     document = f'''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Daily Dashboard {TODAY}</title><link rel="icon" href="assets/todo-favicon.svg" type="image/svg+xml"><link rel="alternate icon" href="assets/todo-favicon.svg">
 <style>
@@ -794,7 +974,8 @@ def main(open_page=True, schedule_reminders=True):
     notion = high_level_notion_digest()
     jobs = job_posts()
     news = tech_news()
-    render(events, news, jobs, links, weekly, notion)
+    discovered_events = discover_events()
+    render(events, news, jobs, links, weekly, notion, discovered_events)
     if schedule_reminders:
         schedule_events(events)
     if open_page:
