@@ -67,6 +67,38 @@ vi.mock("./api", () => ({
     created_at: "2026-07-15T09:00:00-07:00",
     updated_at: "2026-07-15T09:00:00-07:00",
   }]),
+  loadJobLeads: () => Promise.resolve({
+    refreshed_at: "2026-07-17T09:00:00-07:00",
+    items: [{
+      key: "lead-netic-1",
+      company: "Netic",
+      role: "Agent Software Engineer - New Grad",
+      location: "San Francisco, CA",
+      url: "https://example.com/jobs/netic-1",
+      source: "SpeedyApply 2027 AI",
+      track: "new_grad",
+      category: "AI/ML",
+      posted_at: "2026-07-17",
+      age_days: 0,
+      is_big_tech: false,
+      match_score: 96,
+      match_reasons: ["2027 / early-career timing", "AI / agentic systems", "Bay Area / local"],
+      decision: "pending",
+      application_id: null,
+    }],
+  }),
+  loadCandidateProfile: () => Promise.resolve({
+    resume_version: "Chi Cheng-Resume-2026-May.pdf",
+    graduation: "2026-12",
+    location: "Mountain View, CA",
+    target_roles: ["AI / Agentic Software Engineer"],
+    resume_available: true,
+  }),
+  setJobLeadDecision: (key: string, decision: string) => Promise.resolve({ key, decision }),
+  markJobLeadApplied: () => Promise.resolve({
+    lead: { key: "lead-netic-1", decision: "applied", application_id: 13 },
+    application: { id: 13, company: "Netic", role: "Agent Software Engineer - New Grad", job_url: "https://example.com/jobs/netic-1", stage: "applied", next_step: "Follow up if there is no response", applied_at: "2026-07-17", follow_up_at: "2026-07-24", contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "Chi Cheng-Resume-2026-May.pdf", notes: "Auto-imported", created_at: "", updated_at: "" },
+  }),
   createApplication: (payload: object) => Promise.resolve({ id: 13, ...payload, created_at: "2026-07-17T09:00:00-07:00", updated_at: "2026-07-17T09:00:00-07:00" }),
   updateApplication: (id: number, payload: object) => Promise.resolve({ id, company: "OpenAI", role: "Software Engineer", job_url: "", stage: "applied", next_step: "", applied_at: null, follow_up_at: null, contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "", notes: "", created_at: "", updated_at: "", ...payload }),
   deleteApplication: () => Promise.resolve(),
@@ -85,7 +117,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: /去刷题/ })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: /去学习/ })).toHaveAttribute("href", "/learn");
-    expect(screen.getByRole("link", { name: /管投递/ })).toHaveAttribute("href", "/applications");
+    expect(screen.getByRole("link", { name: /今日投递/ })).toHaveAttribute("href", "/applications");
     expect(screen.getByRole("link", { name: /看活动/ })).toHaveAttribute("href", "/discover");
     expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
     expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
@@ -155,12 +187,16 @@ describe("App", () => {
 
   it("renders the local application CRM with follow-up and resume context", async () => {
     render(<MemoryRouter initialEntries={["/applications"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "ApplicationCRM" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Today toApply" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Today to apply" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agent Software Engineer - New Grad" })).toBeInTheDocument();
+    expect(screen.getByText("96% MATCH")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "OPEN RESUME ↗" })).toHaveAttribute("href", "/api/v1/candidate-profile/resume");
     expect(screen.getByRole("heading", { name: "OpenAI" })).toBeInTheDocument();
     expect(screen.getAllByText("Follow up with CMU alumnus")).toHaveLength(2);
     expect(screen.getByText("backend-v3.pdf")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Follow-up queue" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /LOG APPLICATION/ }));
+    fireEvent.click(screen.getByRole("button", { name: /MANUAL ENTRY/ }));
     expect(screen.getByRole("region", { name: "New application" })).toBeInTheDocument();
     expect(screen.getByText("Primary contact / 主要联系人")).toBeInTheDocument();
   });

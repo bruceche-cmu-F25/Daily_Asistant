@@ -86,6 +86,21 @@ class JobApplication(Base):
     updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
 
 
+class JobLeadDecision(Base):
+    __tablename__ = "job_lead_decisions"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('pending', 'skipped', 'applied')",
+            name="ck_job_lead_decision",
+        ),
+    )
+
+    lead_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    decision: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    application_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
 class SyncState(Base):
     __tablename__ = "sync_states"
 

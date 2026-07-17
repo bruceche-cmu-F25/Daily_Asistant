@@ -1,4 +1,4 @@
-import type { AttemptStatus, DashboardSnapshot, JobApplication, JobApplicationPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState } from "./types";
+import type { AttemptStatus, CandidateProfile, DashboardSnapshot, JobApplication, JobApplicationPayload, JobLead, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState } from "./types";
 
 export async function loadDashboard(): Promise<DashboardSnapshot> {
   const response = await fetch("/api/v1/dashboard", { cache: "no-store" });
@@ -73,6 +73,35 @@ export async function loadApplications(): Promise<JobApplication[]> {
   if (!response.ok) throw new Error(`Application CRM API failed: ${response.status}`);
   const payload = await response.json() as { items: JobApplication[] };
   return payload.items;
+}
+
+export async function loadJobLeads(): Promise<{ items: JobLead[]; refreshed_at: string }> {
+  const response = await fetch("/api/v1/job-leads", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Daily job queue API failed: ${response.status}`);
+  return response.json() as Promise<{ items: JobLead[]; refreshed_at: string }>;
+}
+
+export async function loadCandidateProfile(): Promise<CandidateProfile> {
+  const response = await fetch("/api/v1/candidate-profile", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Candidate profile API failed: ${response.status}`);
+  return response.json() as Promise<CandidateProfile>;
+}
+
+export async function setJobLeadDecision(leadKey: string, decision: "pending" | "skipped"): Promise<JobLead> {
+  const response = await fetch(`/api/v1/job-leads/${encodeURIComponent(leadKey)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+  if (!response.ok) throw new Error(`Job decision save failed: ${response.status}`);
+  const result = await response.json() as { lead: JobLead };
+  return result.lead;
+}
+
+export async function markJobLeadApplied(leadKey: string): Promise<{ lead: JobLead; application: JobApplication }> {
+  const response = await fetch(`/api/v1/job-leads/${encodeURIComponent(leadKey)}/applied`, { method: "POST" });
+  if (!response.ok) throw new Error(`Application capture failed: ${response.status}`);
+  return response.json() as Promise<{ lead: JobLead; application: JobApplication }>;
 }
 
 export async function createApplication(payload: JobApplicationPayload): Promise<JobApplication> {

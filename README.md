@@ -18,7 +18,7 @@ cd frontend && npm install && npm run build && cd ..
 http://127.0.0.1:8766/
 ```
 
-新版当前包含 `/`、`/learn`、`/neetcode`、`/applications`、`/discover` 五条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt、本地 Todo 状态和求职申请 CRM API。`/applications` 把公司、岗位、阶段、下一步、follow-up 日期、主要联系人、联系状态、简历版本和备注保存在这台 Mac 的 `data/daily_v2.db`，并把到期跟进集中到页面顶部。`/learn` 以 freeCodeCamp JavaScript V9 和 Front End Development Libraries V9 为课程主线，保留官方 JavaScript 视频及 Advanced TypeScript 播放列表，并加入可勾选的 Python Project Gym、FastAPI/pytest/架构/CI 资源，以及 Project Based Learning 和 Build Your Own X 特殊挑战通道；只在这台 Mac 的浏览器保存完成次数和项目 checklist。`/discover` 是只读湾区活动雷达：每天从 Brave 搜索 Luma、CMU Silicon Valley 和大厂在 Bay Area 的活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
+新版当前包含 `/`、`/learn`、`/neetcode`、`/applications`、`/discover` 五条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt、本地 Todo 状态和求职申请 API。`/applications` 每天从 Simplify New Grad、SpeedyApply 2027 SWE/AI 的公开数据中抓取、去重并按本地简历画像排序，只把最高分的 8 个放进今日投递队列；点 `I APPLIED` 会自动写入 `data/daily_v2.db`，记录公司、岗位、链接、简历版本和投递日期，并创建 7 天后的 follow-up。完整 CRM、联系人、阶段和备注仍保留在页面下方。`data/candidate_profile.json`、简历原文件、岗位快照和 SQLite 均只保存在这台 Mac，不提交到 Git。`/learn` 以 freeCodeCamp JavaScript V9 和 Front End Development Libraries V9 为课程主线，保留官方 JavaScript 视频及 Advanced TypeScript 播放列表，并加入可勾选的 Python Project Gym、FastAPI/pytest/架构/CI 资源，以及 Project Based Learning 和 Build Your Own X 特殊挑战通道；只在这台 Mac 的浏览器保存完成次数和项目 checklist。`/discover` 是只读湾区活动雷达：每天从 Brave 搜索 Luma、CMU Silicon Valley 和大厂在 Bay Area 的活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
 
 无损创建 v2 数据库并导入旧版刷题记录：
 
@@ -56,6 +56,7 @@ PYTHONPYCACHEPREFIX=/tmp/daily-dashboard-pycache \
 - Google Calendar：通过 `gcalcli` 读取当天日程。
 - Notion：通过 `NOTION_API_TOKEN` 读取主页面和链接页面。
 - Brave Search：通过 `BRAVE_API_KEY` 直接调用 Web Search API，不依赖 pi agent skill。
+- Job Feeds：通过公开的 Simplify New Grad JSON 和 SpeedyApply 2027 SWE/AI Markdown 列表生成本地今日投递队列。
 
 默认配置可以用环境变量覆盖：
 
@@ -115,4 +116,4 @@ Retro shader 主题分别维护在：
 
 `~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 每天 09:00 调用 `bin/run_daily.sh`。脚本刷新数据后会打开新版主页 `http://127.0.0.1:8766/`；生成器会先写临时文件，再原子替换 `today.html`，避免中断时留下不完整页面。
 
-页面顶部会显示 Calendar、Notion、Brave Search 三个数据源的生成状态。`pi-web.log` 和 `pi-web.err` 是旧版本遗留文件，当前流程不再启动 pi-web。
+页面顶部会显示 Calendar、Notion、Brave Search、Job Feeds 四个数据源的生成状态。`pi-web.log` 和 `pi-web.err` 是旧版本遗留文件，当前流程不再启动 pi-web。

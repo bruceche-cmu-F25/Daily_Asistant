@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
-import { createApplication, deleteApplication, loadApplications, updateApplication } from "../api";
-import type { ApplicationStage, ContactStatus, ContactType, JobApplication, JobApplicationPayload } from "../types";
+import { createApplication, deleteApplication, loadApplications, loadCandidateProfile, loadJobLeads, markJobLeadApplied, setJobLeadDecision, updateApplication } from "../api";
+import type { ApplicationStage, CandidateProfile, ContactStatus, ContactType, JobApplication, JobApplicationPayload, JobLead } from "../types";
 
 const stages: Array<{ value: ApplicationStage; label: string; short: string }> = [
   { value: "saved", label: "Saved / 待投", short: "SAVED" },
@@ -77,6 +77,11 @@ function contactLabel(type: ContactType, status: ContactStatus) {
 
 export function ApplicationsPage() {
   const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [leads, setLeads] = useState<JobLead[]>([]);
+  const [profile, setProfile] = useState<CandidateProfile | null>(null);
+  const [feedRefreshedAt, setFeedRefreshedAt] = useState("");
+  const [showAllLeads, setShowAllLeads] = useState(false);
+  const [leadBusy, setLeadBusy] = useState("");
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<ApplicationStage | "all">("all");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -86,9 +91,16 @@ export function ApplicationsPage() {
   const [error, setError] = useState("");
   const today = todayKey();
 
-  const refresh = () => loadApplications().then(setApplications).catch((reason: unknown) => {
-    setError(reason instanceof Error ? reason.message : "Unable to load applications");
-  });
+  const refresh = () => Promise.all([loadApplications(), loadJobLeads(), loadCandidateProfile()])
+    .then(([applicationItems, jobFeed, candidate]) => {
+      setApplications(applicationItems);
+      setLeads(jobFeed.items);
+      setFeedRefreshedAt(jobFeed.refreshed_at);
+      setProfile(candidate);
+    })
+    .catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : "Unable to load the application workspace");
+    });
 
   useEffect(() => {
     refresh();
@@ -98,12 +110,18 @@ export function ApplicationsPage() {
     item.follow_up_at && item.follow_up_at <= today && !terminalStages.has(item.stage)
   )), [applications, today]);
 
+  const pendingLeads = useMemo(() => leads.filter((lead) => lead.decision === "pending"), [leads]);
+  const dailyLeads = pendingLeads.slice(0, 8);
+  const visibleLeads = showAllLeads ? dailyLeads : dailyLeads.slice(0, 6);
+  const bigTechLeads = pendingLeads.filter((lead) => lead.is_big_tech && (lead.age_days === null || lead.age_days <= 30)).slice(0, 8);
+
   const summary = useMemo(() => ({
+    ready: dailyLeads.length,
     active: applications.filter((item) => !terminalStages.has(item.stage)).length,
     due: due.length,
     interviews: applications.filter((item) => item.stage === "recruiter_screen" || item.stage === "interview").length,
     offers: applications.filter((item) => item.stage === "offer").length,
-  }), [applications, due.length]);
+  }), [applications, due.length, dailyLeads.length]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -120,9 +138,38 @@ export function ApplicationsPage() {
 
   const openNew = () => {
     setEditingId(null);
-    setForm({ ...blankForm, applied_at: today });
+    setForm({ ...blankForm, applied_at: today, resume_version: profile?.resume_version ?? "" });
     setEditorOpen(true);
     setError("");
+  };
+
+  const appliedFromLead = async (lead: JobLead) => {
+    setLeadBusy(lead.key);
+    setError("");
+    try {
+      const saved = await markJobLeadApplied(lead.key);
+      setLeads((current) => current.map((item) => item.key === lead.key ? saved.lead : item));
+      setApplications((current) => current.some((item) => item.id === saved.application.id)
+        ? current.map((item) => item.id === saved.application.id ? saved.application : item)
+        : [saved.application, ...current]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to capture the application");
+    } finally {
+      setLeadBusy("");
+    }
+  };
+
+  const skipLead = async (lead: JobLead) => {
+    setLeadBusy(lead.key);
+    setError("");
+    try {
+      const saved = await setJobLeadDecision(lead.key, "skipped");
+      setLeads((current) => current.map((item) => item.key === lead.key ? saved : item));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to skip this role");
+    } finally {
+      setLeadBusy("");
+    }
   };
 
   const openEdit = (application: JobApplication) => {
@@ -203,20 +250,58 @@ export function ApplicationsPage() {
     <main className="applications-page">
       <section className="applications-hero panel">
         <div>
-          <p className="eyebrow">LOCAL JOB SEARCH SYSTEM / 本地求职数据库</p>
-          <h1>Application<br /><span>CRM</span></h1>
-          <p>记录每一次投递，把“等消息”变成明确的下一步：该跟进谁、什么时候跟进、用了哪份简历。</p>
-          <button className="application-add" type="button" onClick={openNew}>+ LOG APPLICATION / 记录投递</button>
+          <p className="eyebrow">AUTO-MATCHED DAILY QUEUE / 自动匹配投递</p>
+          <h1>Today to<br /><span>Apply</span></h1>
+          <p>系统每天从公开岗位源筛选适合你的新岗位。你只做两个动作：打开投递；投完点一下“已投”，其余归档和跟进日期自动完成。</p>
+          <div className="application-hero-actions">
+            <a className="application-add" href="#today-apply">START TODAY / 开始投递</a>
+            <button type="button" onClick={openNew}>+ MANUAL ENTRY</button>
+            {profile?.resume_available && <a href="/api/v1/candidate-profile/resume" target="_blank" rel="noopener noreferrer">OPEN RESUME ↗</a>}
+          </div>
+          {profile && <p className="candidate-line"><b>{profile.resume_version}</b><span>{profile.location} · GRAD {profile.graduation}</span></p>}
         </div>
         <div className="application-summary" aria-label="Application pipeline summary">
+          <div><b>{String(summary.ready).padStart(2, "0")}</b><span>Matched & ready</span></div>
           <div><b>{String(summary.active).padStart(2, "0")}</b><span>Active pipeline</span></div>
           <div className={summary.due ? "attention" : ""}><b>{String(summary.due).padStart(2, "0")}</b><span>Follow-up due</span></div>
           <div><b>{String(summary.interviews).padStart(2, "0")}</b><span>In interviews</span></div>
-          <div><b>{String(summary.offers).padStart(2, "0")}</b><span>Offers</span></div>
         </div>
       </section>
 
       {error && <div className="application-error" role="alert">{error}</div>}
+
+      <section className="job-source-strip panel" aria-label="Automatic job sources">
+        <div><span>LIVE SOURCES</span><b>{feedRefreshedAt ? `REFRESHED ${new Date(feedRefreshedAt).toLocaleString()}` : "WAITING FOR FIRST REFRESH"}</b></div>
+        <a href="https://github.com/SimplifyJobs/New-Grad-Positions" target="_blank" rel="noopener noreferrer"><strong>SIMPLIFY</strong><span>NEW GRAD</span></a>
+        <a href="https://github.com/speedyapply/2027-SWE-College-Jobs" target="_blank" rel="noopener noreferrer"><strong>SPEEDY</strong><span>2027 SWE</span></a>
+        <a href="https://github.com/speedyapply/2027-AI-College-Jobs" target="_blank" rel="noopener noreferrer"><strong>SPEEDY</strong><span>2027 AI</span></a>
+        <a href="https://simplify.jobs/jobs" target="_blank" rel="noopener noreferrer"><strong>SIMPLIFY</strong><span>SEARCH</span></a>
+        <a href="https://career-ops.org/docs" target="_blank" rel="noopener noreferrer"><strong>CAREER OPS</strong><span>LOCAL TOOLS</span></a>
+      </section>
+
+      <section className="job-lead-queue panel" id="today-apply" aria-label="Today to apply">
+        <div className="application-section-head">
+          <div><p className="eyebrow">TODAY'S SHORTLIST</p><h2>Apply queue / 今日投递</h2></div>
+          <b>{dailyLeads.length} TODAY · {pendingLeads.length} MATCHED</b>
+        </div>
+        {visibleLeads.length ? <div className="job-lead-grid">{visibleLeads.map((lead, index) => (
+          <article key={lead.key}>
+            <header><span>{String(index + 1).padStart(2, "0")}</span><div><b>{lead.match_score}% MATCH</b><small>{lead.track === "internship" ? "INTERNSHIP" : "NEW GRAD"}</small></div></header>
+            <div className="job-lead-title"><p>{lead.company}</p><h3>{lead.role}</h3><span>{lead.location || "Location not listed"}</span></div>
+            <div className="job-match-reasons">{lead.match_reasons.map((reason) => <span key={reason}>{reason}</span>)}</div>
+            <footer>
+              <div><span>{lead.source}</span><b>{lead.posted_at ? `POSTED ${displayDate(lead.posted_at)}` : "FIRST SEEN TODAY"}</b></div>
+              <div><a href={lead.url} target="_blank" rel="noopener noreferrer">OPEN & APPLY ↗</a><button type="button" disabled={leadBusy === lead.key} onClick={() => appliedFromLead(lead)}>{leadBusy === lead.key ? "SAVING…" : "I APPLIED / 自动归档"}</button><button className="skip" type="button" disabled={leadBusy === lead.key} onClick={() => skipLead(lead)}>SKIP</button></div>
+            </footer>
+          </article>
+        ))}</div> : <div className="application-empty"><b>QUEUE CLEAR</b><p>今天匹配到的岗位已经处理完，或岗位源正在等待首次刷新。</p></div>}
+        {dailyLeads.length > 6 && <button className="show-more-leads" type="button" onClick={() => setShowAllLeads((current) => !current)}>{showAllLeads ? "SHOW TOP 6" : `SHOW TODAY'S ${dailyLeads.length}`}</button>}
+      </section>
+
+      {bigTechLeads.length > 0 && <section className="big-tech-watch panel" aria-label="Big tech openings">
+        <div className="application-section-head"><div><p className="eyebrow">VERIFIED OPENINGS</p><h2>Big Tech watch / 大厂新岗位</h2></div><b>NO GUESSED DATES</b></div>
+        <div>{bigTechLeads.map((lead) => <a href={lead.url} target="_blank" rel="noopener noreferrer" key={lead.key}><span>{lead.company}</span><b>{lead.role}</b><small>{lead.posted_at ? `POSTED ${displayDate(lead.posted_at)}` : "FIRST SEEN IN FEED"} · {lead.location}</small></a>)}</div>
+      </section>}
 
       {editorOpen && (
         <section className="application-editor panel" aria-label={editingId === null ? "New application" : "Edit application"}>

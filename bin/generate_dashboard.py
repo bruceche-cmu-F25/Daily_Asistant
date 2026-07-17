@@ -16,6 +16,11 @@ import urllib.request
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+BIN_DIR = Path(__file__).resolve().parent
+if str(BIN_DIR) not in sys.path:
+    sys.path.insert(0, str(BIN_DIR))
+from job_feed import collect_job_leads, load_candidate_profile
+
 HOME = Path.home()
 BASE = Path(os.environ.get('DASHBOARD_HOME', Path(__file__).resolve().parent.parent))
 OUT = BASE / 'today.html'
@@ -41,9 +46,11 @@ JOBRIGHT = 'https://jobright.ai/jobs/recommend'
 SIMPLIFY = 'https://simplify.jobs/jobs'
 NEETCODE = 'https://neetcode.io/roadmap'
 GMAIL = 'https://mail.google.com/mail/u/0/#inbox'
-SWE_INTERNS = 'https://github.com/SimplifyJobs/Summer2026-Internships'
+SWE_INTERNS = 'https://github.com/speedyapply/2027-SWE-College-Jobs'
 SWE_NEW_GRAD = 'https://github.com/SimplifyJobs/New-Grad-Positions'
-SPEEDY_AI = 'https://github.com/speedyapply/2026-AI-College-Jobs'
+SPEEDY_AI = 'https://github.com/speedyapply/2027-AI-College-Jobs'
+CAREER_OPS = 'https://career-ops.org/'
+CANDIDATE_PROFILE_PATH = BASE / 'data' / 'candidate_profile.json'
 SERVER_PORT = int(os.environ.get('DASHBOARD_PORT', '8765'))
 SERVER_URL = f'http://127.0.0.1:{SERVER_PORT}/today.html'
 
@@ -83,6 +90,7 @@ def write_dashboard_snapshot(payload):
         'Calendar': ('events',),
         'Notion': ('links', 'weekly', 'notion', 'weekly_plan'),
         'Brave Search': ('jobs', 'news', 'discover_events'),
+        'Job Feeds': ('job_leads', 'candidate_profile'),
     }
     for source, fields in fallback_fields.items():
         if SOURCE_STATUS.get(source, {}).get('ok'):
@@ -508,9 +516,10 @@ def links_to_visit():
     required_jobs = [
         {'title': 'JobRight recommendations / 每天优先刷', 'url': JOBRIGHT},
         {'title': 'Simplify jobs', 'url': SIMPLIFY},
-        {'title': 'GitHub 2026 SWE Internships', 'url': SWE_INTERNS},
+        {'title': 'SpeedyApply 2027 SWE Internships + New Grad', 'url': SWE_INTERNS},
         {'title': 'GitHub New Grad Positions', 'url': SWE_NEW_GRAD},
-        {'title': 'SpeedyApply 2026 AI College Jobs', 'url': SPEEDY_AI},
+        {'title': 'SpeedyApply 2027 AI College Jobs', 'url': SPEEDY_AI},
+        {'title': 'Career Ops / tailored application toolkit', 'url': CAREER_OPS},
     ]
     return {
         'study': dedupe_links(required_study + sections['study'])[:14],
@@ -743,7 +752,7 @@ def render_digest(items):
 
 def render_source_status():
     chips = []
-    for source in ('Calendar', 'Notion', 'Brave Search'):
+    for source in ('Calendar', 'Notion', 'Brave Search', 'Job Feeds'):
         state = SOURCE_STATUS.get(source, {'ok': False, 'detail': 'Not checked'})
         kind = 'ok' if state['ok'] else 'warn'
         symbol = '●' if state['ok'] else '△'
@@ -760,12 +769,14 @@ def event_action_html(event):
     return visual_anchor('btn', event.get('url'), 'Open / 开始做')
 
 
-def render(events, news, jobs, links, weekly, notion, discovered_events=None):
+def render(events, news, jobs, links, weekly, notion, discovered_events=None, job_leads=None, candidate_profile=None):
     discovered_events = discovered_events or []
+    job_leads = job_leads or []
+    candidate_profile = candidate_profile or {}
     theme_css = (ASSET_DIR / 'dashboard-retro.css').read_text(encoding='utf-8')
     theme_js = (ASSET_DIR / 'dashboard-retro.js').read_text(encoding='utf-8')
     task_count = sum(1 for item in weekly + notion if item.get('is_todo'))
-    sources_online = all(SOURCE_STATUS.get(name, {}).get('ok') for name in ('Calendar', 'Notion', 'Brave Search'))
+    sources_online = all(SOURCE_STATUS.get(name, {}).get('ok') for name in ('Calendar', 'Notion', 'Brave Search', 'Job Feeds'))
     sync_label = 'ALL SYSTEMS ONLINE' if sources_online else 'DEGRADED MODE'
     event_cards = ''.join(f'''
       <article class="event {'allday' if e['all_day'] else ''}">
@@ -786,9 +797,9 @@ def render(events, news, jobs, links, weekly, notion, discovered_events=None):
         low = title.lower()
         if 'jobright' in low:
             job_groups['Daily first / 每天先刷'].append(x)
-        elif any(k in low for k in ['github', 'speedy', 'tiktok', '2026 tech', 'new grad positions']):
+        elif any(k in low for k in ['github', 'speedy', 'tiktok', '2027 tech', 'new grad positions']):
             job_groups['Curated lists / 岗位列表'].append(x)
-        elif any(k in low for k in ['simplify', 'handshake', 'yc', 'avisajob', 'linkedin']):
+        elif any(k in low for k in ['simplify', 'handshake', 'yc', 'avisajob', 'linkedin', 'career ops']):
             job_groups['Platforms / 平台入口'].append(x)
         else:
             job_groups['Profile & prep / 简历和准备'].append(x)
@@ -862,7 +873,7 @@ def render(events, news, jobs, links, weekly, notion, discovered_events=None):
                 'ok': bool(SOURCE_STATUS.get(source, {}).get('ok')),
                 'detail': SOURCE_STATUS.get(source, {}).get('detail', 'Not checked'),
             }
-            for source in ('Calendar', 'Notion', 'Brave Search')
+            for source in ('Calendar', 'Notion', 'Brave Search', 'Job Feeds')
         ],
         'events': [{**event, 'key': stable_event_key(event)} for event in events],
         'links': links,
@@ -871,6 +882,11 @@ def render(events, news, jobs, links, weekly, notion, discovered_events=None):
         'jobs': jobs,
         'news': news,
         'discover_events': discovered_events,
+        'job_leads': job_leads,
+        'candidate_profile': {
+            key: candidate_profile.get(key)
+            for key in ('resume_version', 'graduation', 'location', 'target_roles')
+        },
         'job_groups': job_groups,
         'quick_actions': [
             {'title': title, 'subtitle': subtitle, 'url': url, 'kind': kind}
@@ -975,7 +991,26 @@ def main(open_page=True, schedule_reminders=True):
     jobs = job_posts()
     news = tech_news()
     discovered_events = discover_events()
-    render(events, news, jobs, links, weekly, notion, discovered_events)
+    candidate_profile = load_candidate_profile(CANDIDATE_PROFILE_PATH)
+    job_leads, job_feed_errors = collect_job_leads(candidate_profile, today=TODAY)
+    if job_leads:
+        detail = f'{len(job_leads)} matched roles'
+        if job_feed_errors:
+            detail += f'; {len(job_feed_errors)} source warnings'
+        set_status('Job Feeds', True, detail)
+    else:
+        set_status('Job Feeds', False, '; '.join(job_feed_errors) or 'No matching roles')
+    render(
+        events,
+        news,
+        jobs,
+        links,
+        weekly,
+        notion,
+        discovered_events,
+        job_leads,
+        candidate_profile,
+    )
     if schedule_reminders:
         schedule_events(events)
     if open_page:

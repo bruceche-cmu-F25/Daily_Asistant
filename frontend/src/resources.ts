@@ -26,7 +26,8 @@ export const dashboardResources: DashboardResource[] = [
   { id: "handshake", title: "Handshake", subtitle: "Campus opportunities", url: "https://app.joinhandshake.com/", category: "jobs", mark: "H", accent: "purple" },
   { id: "summer-internships", title: "2026 SWE Internships", subtitle: "SimplifyJobs GitHub list", url: "https://github.com/SimplifyJobs/Summer2026-Internships", category: "jobs", mark: "GH", accent: "green" },
   { id: "new-grad", title: "New Grad Positions", subtitle: "SimplifyJobs GitHub list", url: "https://github.com/SimplifyJobs/New-Grad-Positions", category: "jobs", mark: "GH", accent: "green" },
-  { id: "ai-college-jobs", title: "AI College Jobs", subtitle: "SpeedyApply 2026 list", url: "https://github.com/speedyapply/2026-AI-College-Jobs", category: "jobs", mark: "AI", accent: "cyan" },
+  { id: "ai-college-jobs", title: "AI College Jobs", subtitle: "SpeedyApply 2027 list", url: "https://github.com/speedyapply/2027-AI-College-Jobs", category: "jobs", mark: "AI", accent: "cyan" },
+  { id: "career-ops", title: "Career Ops", subtitle: "Local-first job search tools", url: "https://career-ops.org/docs", category: "jobs", mark: "CO", accent: "green" },
 
   { id: "odin", title: "The Odin Project", subtitle: "Full-stack JavaScript", url: "https://www.theodinproject.com/paths/full-stack-javascript", category: "study", mark: "O", accent: "green" },
   { id: "python-30", title: "30 Days of Python", subtitle: "Asabeneh curriculum", url: "https://github.com/Asabeneh/30-Days-Of-Python", category: "study", mark: "PY", accent: "blue" },

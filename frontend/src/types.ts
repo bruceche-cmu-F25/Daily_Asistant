@@ -99,6 +99,34 @@ export type DashboardSnapshot = {
   target_copy_cn: string;
 };
 
+export type JobLeadDecision = "pending" | "skipped" | "applied";
+
+export type JobLead = {
+  key: string;
+  company: string;
+  role: string;
+  location: string;
+  url: string;
+  source: string;
+  track: "new_grad" | "internship" | string;
+  category: string;
+  posted_at: string | null;
+  age_days: number | null;
+  is_big_tech: boolean;
+  match_score: number;
+  match_reasons: string[];
+  decision: JobLeadDecision;
+  application_id: number | null;
+};
+
+export type CandidateProfile = {
+  resume_version: string;
+  graduation: string;
+  location: string;
+  target_roles: string[];
+  resume_available: boolean;
+};
+
 export type TodoState = {
   item_key: string;
   source: string;
