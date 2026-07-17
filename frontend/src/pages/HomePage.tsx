@@ -59,7 +59,8 @@ export function HomePage({ dashboard }: Props) {
           <div className="legacy-hero-actions" aria-label="Primary actions">
             <Link className="legacy-primary-action solve" to="/neetcode"><span>01</span><b>去刷题</b><small>NEETCODE 150 →</small></Link>
             <Link className="legacy-primary-action learn" to="/learn"><span>02</span><b>去学习</b><small>JAVASCRIPT + PYTHON →</small></Link>
-            <Link className="legacy-primary-action discover" to="/discover"><span>03</span><b>看活动</b><small>NEWS + EVENTS →</small></Link>
+            <Link className="legacy-primary-action crm" to="/applications"><span>03</span><b>管投递</b><small>APPLICATION CRM →</small></Link>
+            <Link className="legacy-primary-action discover" to="/discover"><span>04</span><b>看活动</b><small>NEWS + EVENTS →</small></Link>
           </div>
           <p className="legacy-hero-meta">Generated {dashboard.generated_at ? dashboard.generated_at.replace("T", " ").slice(0, 16) : "waiting for first sync"} · <a href="https://www.notion.so/35ea5189545c80cfa8c3c910e0265817?source=copy_link" target="_blank" rel="noopener noreferrer">Notion / 变得更强</a>{dashboard.weekly_plan.url && <> · <a href={dashboard.weekly_plan.url} target="_blank" rel="noopener noreferrer">{dashboard.weekly_plan.title}</a></>}</p>
         </div>

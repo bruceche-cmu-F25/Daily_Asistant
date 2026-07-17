@@ -50,6 +50,26 @@ vi.mock("./api", () => ({
   createAttempt: () => Promise.resolve({ ok: true, attempt: {} }),
   loadTodos: () => Promise.resolve([]),
   saveTodo: () => Promise.resolve({ item_key: "", source: "", title: "", completed: true, updated_at: "" }),
+  loadApplications: () => Promise.resolve([{
+    id: 12,
+    company: "OpenAI",
+    role: "Software Engineer",
+    job_url: "https://example.com/jobs/1",
+    stage: "applied",
+    next_step: "Follow up with CMU alumnus",
+    applied_at: "2026-07-15",
+    follow_up_at: "2026-07-16",
+    contact_name: "Alex",
+    contact_type: "alumni",
+    contact_status: "contacted",
+    resume_version: "backend-v3.pdf",
+    notes: "Emphasize FastAPI work.",
+    created_at: "2026-07-15T09:00:00-07:00",
+    updated_at: "2026-07-15T09:00:00-07:00",
+  }]),
+  createApplication: (payload: object) => Promise.resolve({ id: 13, ...payload, created_at: "2026-07-17T09:00:00-07:00", updated_at: "2026-07-17T09:00:00-07:00" }),
+  updateApplication: (id: number, payload: object) => Promise.resolve({ id, company: "OpenAI", role: "Software Engineer", job_url: "", stage: "applied", next_step: "", applied_at: null, follow_up_at: null, contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "", notes: "", created_at: "", updated_at: "", ...payload }),
+  deleteApplication: () => Promise.resolve(),
 }));
 
 afterEach(() => {
@@ -65,6 +85,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: /去刷题/ })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: /去学习/ })).toHaveAttribute("href", "/learn");
+    expect(screen.getByRole("link", { name: /管投递/ })).toHaveAttribute("href", "/applications");
     expect(screen.getByRole("link", { name: /看活动/ })).toHaveAttribute("href", "/discover");
     expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
     expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
@@ -130,6 +151,18 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Project challenge lane / 特殊项目通道" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /ENTER GUIDED CHANNEL/ })).toHaveAttribute("href", "https://github.com/practical-tutorials/project-based-learning#python");
     expect(screen.getByRole("link", { name: /ENTER FROM-SCRATCH CHANNEL/ })).toHaveAttribute("href", "https://github.com/codecrafters-io/build-your-own-x");
+  });
+
+  it("renders the local application CRM with follow-up and resume context", async () => {
+    render(<MemoryRouter initialEntries={["/applications"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "ApplicationCRM" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "OpenAI" })).toBeInTheDocument();
+    expect(screen.getAllByText("Follow up with CMU alumnus")).toHaveLength(2);
+    expect(screen.getByText("backend-v3.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Follow-up queue" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /LOG APPLICATION/ }));
+    expect(screen.getByRole("region", { name: "New application" })).toBeInTheDocument();
+    expect(screen.getByText("Primary contact / 主要联系人")).toBeInTheDocument();
   });
 
   it("asks for the solution only after the user finishes the problem", async () => {

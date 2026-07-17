@@ -1,4 +1,4 @@
-import type { AttemptStatus, DashboardSnapshot, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState } from "./types";
+import type { AttemptStatus, DashboardSnapshot, JobApplication, JobApplicationPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState } from "./types";
 
 export async function loadDashboard(): Promise<DashboardSnapshot> {
   const response = await fetch("/api/v1/dashboard", { cache: "no-store" });
@@ -66,4 +66,41 @@ export async function saveTodo(
   if (!response.ok) throw new Error(`Todo save failed: ${response.status}`);
   const result = await response.json() as { item: TodoState };
   return result.item;
+}
+
+export async function loadApplications(): Promise<JobApplication[]> {
+  const response = await fetch("/api/v1/applications", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Application CRM API failed: ${response.status}`);
+  const payload = await response.json() as { items: JobApplication[] };
+  return payload.items;
+}
+
+export async function createApplication(payload: JobApplicationPayload): Promise<JobApplication> {
+  const response = await fetch("/api/v1/applications", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Application save failed: ${response.status}`);
+  const result = await response.json() as { application: JobApplication };
+  return result.application;
+}
+
+export async function updateApplication(
+  applicationId: number,
+  payload: Partial<JobApplicationPayload>,
+): Promise<JobApplication> {
+  const response = await fetch(`/api/v1/applications/${applicationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Application update failed: ${response.status}`);
+  const result = await response.json() as { application: JobApplication };
+  return result.application;
+}
+
+export async function deleteApplication(applicationId: number): Promise<void> {
+  const response = await fetch(`/api/v1/applications/${applicationId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Application delete failed: ${response.status}`);
 }

@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-d
 
 import { loadDashboard, loadNeetCode } from "./api";
 import { BrandGlyph, brandIdentity } from "./components/BrandLogo";
+import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
 import { LearnPage } from "./pages/LearnPage";
@@ -48,6 +49,7 @@ const searchableSections = [
   { title: "Today", subtitle: "Todo, calendar and quick launch", path: "/#today-queue" },
   { title: "NeetCode 150", subtitle: "Roadmap, workspace and history", path: "/neetcode" },
   { title: "Job Hunt", subtitle: "Application platforms and curated lists", path: "/#job-resources" },
+  { title: "Application CRM", subtitle: "Applications, stages, follow-ups, contacts and resume versions", path: "/applications" },
   { title: "Learning Lab", subtitle: "freeCodeCamp JavaScript, Python engineering and project practice", path: "/learn" },
   { title: "Study Resources", subtitle: "Courses and project-based learning", path: "/#study-resources" },
   { title: "Discover", subtitle: "Tech news and events", path: "/discover" },
@@ -133,6 +135,7 @@ export function App() {
           <NavLink to="/neetcode">NEETCODE</NavLink>
           <a href="/neetcode#history">HISTORY</a>
           <a href="/#jobs">JOBS</a>
+          <NavLink to="/applications">CRM</NavLink>
           <NavLink to="/discover">SIGNAL</NavLink>
         </nav>
         <div className="global-search" role="search">
@@ -182,6 +185,7 @@ export function App() {
         <Route path="/" element={<HomePage dashboard={dashboard} />} />
         <Route path="/learn" element={<LearnPage />} />
         <Route path="/neetcode" element={<NeetCodePage snapshot={snapshot} onRefresh={refreshSnapshot} />} />
+        <Route path="/applications" element={<ApplicationsPage />} />
         <Route path="/discover" element={<DiscoverPage dashboard={dashboard} />} />
       </Routes>
       {location.pathname !== "/" && <footer>LOCAL-FIRST / PARALLEL PREVIEW / PORT 8766</footer>}

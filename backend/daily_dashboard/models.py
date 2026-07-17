@@ -51,6 +51,41 @@ class TodoState(Base):
     updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
 
 
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+    __table_args__ = (
+        CheckConstraint(
+            "stage IN ('saved', 'applied', 'oa', 'recruiter_screen', 'interview', 'offer', 'rejected', 'withdrawn')",
+            name="ck_job_application_stage",
+        ),
+        CheckConstraint(
+            "contact_type IN ('none', 'alumni', 'recruiter', 'hiring_manager', 'employee', 'other')",
+            name="ck_job_application_contact_type",
+        ),
+        CheckConstraint(
+            "contact_status IN ('not_contacted', 'planned', 'contacted', 'replied')",
+            name="ck_job_application_contact_status",
+        ),
+        Index("ix_job_application_stage_follow_up", "stage", "follow_up_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str] = mapped_column(String(300), nullable=False)
+    job_url: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    stage: Mapped[str] = mapped_column(String(30), nullable=False, default="saved")
+    next_step: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    applied_at: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    follow_up_at: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    contact_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    contact_type: Mapped[str] = mapped_column(String(30), nullable=False, default="none")
+    contact_status: Mapped[str] = mapped_column(String(30), nullable=False, default="not_contacted")
+    resume_version: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
 class SyncState(Base):
     __tablename__ = "sync_states"
 

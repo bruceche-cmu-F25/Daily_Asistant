@@ -106,3 +106,36 @@ export type TodoState = {
   completed: boolean;
   updated_at: string;
 };
+
+export type ApplicationStage =
+  | "saved"
+  | "applied"
+  | "oa"
+  | "recruiter_screen"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "withdrawn";
+
+export type ContactType = "none" | "alumni" | "recruiter" | "hiring_manager" | "employee" | "other";
+export type ContactStatus = "not_contacted" | "planned" | "contacted" | "replied";
+
+export type JobApplication = {
+  id: number;
+  company: string;
+  role: string;
+  job_url: string;
+  stage: ApplicationStage;
+  next_step: string;
+  applied_at: string | null;
+  follow_up_at: string | null;
+  contact_name: string;
+  contact_type: ContactType;
+  contact_status: ContactStatus;
+  resume_version: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobApplicationPayload = Omit<JobApplication, "id" | "created_at" | "updated_at">;

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api_applications import router as applications_router
 from .api_attempts import router as attempts_router
 from .api_todos import router as todos_router
 from .legacy import PROJECT_ROOT, load_dashboard_snapshot
@@ -13,6 +14,7 @@ from .repository import neetcode_snapshot
 
 
 app = FastAPI(title="Daily Dashboard", version="2.0.0-dev")
+app.include_router(applications_router)
 app.include_router(attempts_router)
 app.include_router(todos_router)
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
