@@ -146,6 +146,29 @@ const projectLadder = [
 const emptyProjectProgress: ProjectProgress = { slice: [], backend: [], quality: [] };
 const projectRepoUrl = "https://github.com/bruceche-cmu-F25/Daily_Asistant/tree/codex/react-fastapi-refactor";
 
+const specialProjectChannels = [
+  {
+    mark: "PBL",
+    mode: "GUIDED BUILD",
+    title: "Project Based Learning",
+    description: "跟着完整教程从零交付一个应用。适合第一次接触某类项目，重点是完成端到端流程。",
+    recommendation: "推荐入口：Python Web Applications",
+    outcome: "完成后必须改一个核心需求，避免只复制教程。",
+    cta: "ENTER GUIDED CHANNEL",
+    url: "https://github.com/practical-tutorials/project-based-learning#python",
+  },
+  {
+    mark: "BYOX",
+    mode: "BUILD FROM SCRATCH",
+    title: "Build Your Own X",
+    description: "重造 Git、数据库、Web Server、Redis 等真实技术。适合训练底层原理、设计取舍和代码深度。",
+    recommendation: "推荐起点：Web Server → Git → Database",
+    outcome: "完成后写架构图、限制和你做过的取舍。",
+    cta: "ENTER FROM-SCRATCH CHANNEL",
+    url: "https://github.com/codecrafters-io/build-your-own-x",
+  },
+] as const;
+
 function localDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -386,6 +409,22 @@ export function LearnPage() {
           <b>PROJECT DEFINITION OF DONE</b>
           <span>清晰目录</span><span>类型和验证</span><span>pytest</span><span>错误处理</span><span>README</span><span>CI 通过</span><span>可演示结果</span>
         </div>
+        <section className="special-project-channel" aria-labelledby="special-project-channel-title">
+          <header>
+            <div><p>SPECIAL CHANNEL / OPTIONAL DEEP BUILD</p><h3 id="special-project-channel-title">Project challenge lane / 特殊项目通道</h3></div>
+            <span>主线卡住时不要逃到这里；完成一个主线 mission，或周末有完整时间再进入。</span>
+          </header>
+          <div className="special-channel-grid">
+            {specialProjectChannels.map((channel) => (
+              <a href={channel.url} target="_blank" rel="noopener noreferrer" key={channel.url}>
+                <span>{channel.mark}</span>
+                <div><small>{channel.mode}</small><h4>{channel.title}</h4><p>{channel.description}</p><b>{channel.recommendation}</b><em>{channel.outcome}</em></div>
+                <strong>{channel.cta} ↗</strong>
+              </a>
+            ))}
+          </div>
+          <footer><b>CHANNEL RULE</b><span>一次只选一个项目</span><span>必须建立独立 repo</span><span>每周有可运行结果</span><span>完成后写 README + demo</span></footer>
+        </section>
       </section>
 
       <section className="panel learn-section career-loop" aria-labelledby="career-loop-title">

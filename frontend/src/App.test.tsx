@@ -125,6 +125,13 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Refactor Learning Backend" })).toBeInTheDocument();
   });
 
+  it("offers explicit Project Based Learning and Build Your Own X challenge channels", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Project challenge lane / 特殊项目通道" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /ENTER GUIDED CHANNEL/ })).toHaveAttribute("href", "https://github.com/practical-tutorials/project-based-learning#python");
+    expect(screen.getByRole("link", { name: /ENTER FROM-SCRATCH CHANNEL/ })).toHaveAttribute("href", "https://github.com/codecrafters-io/build-your-own-x");
+  });
+
   it("asks for the solution only after the user finishes the problem", async () => {
     render(<MemoryRouter initialEntries={["/neetcode"]}><App /></MemoryRouter>);
     expect(screen.queryByLabelText("Solution is required to mark Solved")).not.toBeInTheDocument();

@@ -18,7 +18,7 @@ cd frontend && npm install && npm run build && cd ..
 http://127.0.0.1:8766/
 ```
 
-新版当前包含 `/`、`/learn`、`/neetcode`、`/discover` 四条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt 和本地 Todo 状态 API。`/learn` 以 freeCodeCamp JavaScript V9 和 Front End Development Libraries V9 为课程主线，保留官方 JavaScript 视频及 Advanced TypeScript 播放列表，并加入 FastAPI、pytest、Python Packaging、Cosmic Python、CI 和项目式学习入口；只在这台 Mac 的浏览器保存完成次数。`/discover` 是只读湾区活动雷达：每天从 Brave 搜索 Luma、CMU Silicon Valley 和大厂在 Bay Area 的活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
+新版当前包含 `/`、`/learn`、`/neetcode`、`/discover` 四条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt 和本地 Todo 状态 API。`/learn` 以 freeCodeCamp JavaScript V9 和 Front End Development Libraries V9 为课程主线，保留官方 JavaScript 视频及 Advanced TypeScript 播放列表，并加入可勾选的 Python Project Gym、FastAPI/pytest/架构/CI 资源，以及 Project Based Learning 和 Build Your Own X 特殊挑战通道；只在这台 Mac 的浏览器保存完成次数和项目 checklist。`/discover` 是只读湾区活动雷达：每天从 Brave 搜索 Luma、CMU Silicon Valley 和大厂在 Bay Area 的活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
 
 无损创建 v2 数据库并导入旧版刷题记录：
 
