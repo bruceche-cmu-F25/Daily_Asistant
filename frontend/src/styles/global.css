@@ -519,11 +519,34 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
 .learning-link-grid i { color: var(--green); font-size: 12px; font-style: normal; }
 .project-gym-intro { max-width: 900px; margin: 20px 0 0; color: #c2c9b7; font-size: 11px; line-height: 1.7; }
 .project-ladder { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 22px; }
-.project-ladder article { min-height: 210px; padding: 20px; border: 1px solid var(--line); border-top: 3px solid var(--green); background: rgba(0,0,0,.23); }
-.project-ladder article > span { color: var(--green); font-size: 20px; font-weight: 900; }
+.project-ladder button { min-height: 210px; padding: 20px; border: 1px solid var(--line); border-top: 3px solid var(--green); color: inherit; text-align: left; background: rgba(0,0,0,.23); cursor: pointer; }
+.project-ladder button:hover,.project-ladder button.active { border-color: var(--green); background: rgba(165,255,116,.055); box-shadow: inset 0 0 24px rgba(165,255,116,.035); }
+.project-ladder button > span { color: var(--green); font-size: 20px; font-weight: 900; }
 .project-ladder h3 { margin: 22px 0 0; color: var(--ink); font-size: 18px; text-transform: uppercase; }
 .project-ladder p { margin: 12px 0 22px; color: var(--muted); font-size: 10px; line-height: 1.65; }
 .project-ladder small { color: var(--cyan); font-size: 8px; font-weight: 900; letter-spacing: .05em; }
+.project-mission { margin-top: 10px; border: 1px solid var(--green); background: rgba(0,0,0,.28); }
+.project-mission > header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg,rgba(165,255,116,.055),transparent 60%); }
+.project-mission > header p { margin: 0; color: var(--amber); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.project-mission > header h3 { margin: 7px 0; color: var(--ink); font-size: clamp(22px,2.5vw,34px); text-transform: uppercase; }
+.project-mission > header span { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.project-mission > header strong { color: var(--green); font-size: 34px; line-height: 1; text-align: right; white-space: nowrap; }
+.project-mission > header strong small { display: block; margin-top: 6px; color: var(--muted); font-size: 7px; letter-spacing: .08em; text-transform: uppercase; }
+.project-mission-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(230px,.32fr); gap: 10px; padding: 10px; }
+.project-checklist { display: grid; gap: 6px; }
+.project-checklist label { display: grid; grid-template-columns: 26px minmax(0,1fr); gap: 12px; align-items: center; min-height: 66px; padding: 11px 14px; border: 1px solid var(--line); background: rgba(0,0,0,.2); cursor: pointer; }
+.project-checklist label:hover { border-color: var(--cyan); }
+.project-checklist label.checked { border-color: rgba(165,255,116,.55); background: rgba(165,255,116,.045); }
+.project-checklist input { width: 18px; height: 18px; accent-color: var(--green); }
+.project-checklist b,.project-checklist small { display: block; }
+.project-checklist b { color: var(--ink); font-size: 10px; }
+.project-checklist small { margin-top: 5px; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.project-checklist label.checked b { color: var(--green); text-decoration: line-through; text-decoration-color: rgba(165,255,116,.45); }
+.project-mission aside { display: flex; flex-direction: column; gap: 7px; padding: 16px; border: 1px solid var(--line); background: rgba(0,0,0,.2); }
+.project-mission aside p { margin: 0 0 5px; color: var(--amber); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.project-mission aside a { padding: 10px; border: 1px solid var(--line); color: var(--cyan); font-size: 8px; font-weight: 900; }
+.project-mission aside a:hover { border-color: var(--cyan); background: rgba(103,232,249,.05); }
+.project-mission aside span { margin-top: auto; padding-top: 18px; color: var(--muted); font-size: 8px; line-height: 1.55; }
 .project-definition { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 10px; padding: 13px; border: 1px solid var(--line); background: rgba(0,0,0,.18); }
 .project-definition b { margin-right: 8px; color: var(--amber); font-size: 9px; }
 .project-definition span { padding: 6px 8px; border: 1px solid var(--line); color: var(--muted); font-size: 8px; }
@@ -537,6 +560,7 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
 @media (max-width: 1080px) {
   .learn-hero,.learning-workspace-grid { grid-template-columns: 1fr; }
   .learning-link-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .project-mission-grid { grid-template-columns: 1fr; }
   .career-loop-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 700px) {
@@ -546,6 +570,8 @@ footer { padding: 18px 24px; border-top: 1px solid var(--line); color: var(--mut
   .learning-resource-group { padding: 14px; }
   .learning-resource-group header { grid-template-columns: 1fr; }
   .learning-resource-group header span { grid-column: 1; grid-row: auto; margin-top: 7px; }
+  .project-mission > header { align-items: flex-start; flex-direction: column; }
+  .project-mission > header strong { text-align: left; }
   .learning-track-grid button { grid-template-columns: 42px minmax(0,1fr); }
   .learning-track-grid button > i { grid-column: 2; }
   .course-player { min-height: 210px; }

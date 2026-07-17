@@ -8,8 +8,11 @@ type CourseProgress = {
 };
 
 type LearningProgress = Record<CourseId, CourseProgress>;
+type ProjectId = "slice" | "backend" | "quality";
+type ProjectProgress = Record<ProjectId, string[]>;
 
 const STORAGE_KEY = "daily-dashboard:learning-progress:v1";
+const PROJECT_GYM_STORAGE_KEY = "daily-dashboard:project-gym:v1";
 const emptyProgress: LearningProgress = {
   javascript: { sessions: [] },
   typescript: { sessions: [] },
@@ -78,10 +81,70 @@ const learningResourceGroups = [
 ] as const;
 
 const projectLadder = [
-  { step: "01", title: "Vertical slice", description: "在 Daily Assistant 做一个真实功能：React 页面、FastAPI endpoint、SQLite 持久化和测试一起完成。", result: "用户能看到并使用" },
-  { step: "02", title: "Reliable backend", description: "把业务逻辑从 route 拆到 service/repository，补输入验证、错误处理、日志和 integration tests。", result: "失败时也可预测" },
-  { step: "03", title: "Ship quality", description: "补 pyproject.toml、类型检查、pytest、README 和 GitHub Actions，让新环境可以一条命令运行。", result: "别人能够接手" },
+  {
+    id: "slice",
+    step: "01",
+    title: "Vertical slice",
+    description: "把学习完成次数从 localStorage 升级成真正的 Python API + SQLite 功能。",
+    result: "用户能看到并使用",
+    missionTitle: "Learning Progress API",
+    goal: "完成一个贯穿 React、FastAPI、SQLite 和测试的真实功能，而不是只写孤立 endpoint。",
+    tasks: [
+      { id: "api-contract", label: "Design the learning session API contract", detail: "定义 GET/POST 的 request、response 和错误状态。" },
+      { id: "database-model", label: "Add the SQLite learning session model", detail: "新增 model 和 Alembic migration，保证重复记录可控。" },
+      { id: "fastapi-routes", label: "Implement FastAPI read and write routes", detail: "完成依赖注入、验证和 repository 调用。" },
+      { id: "react-integration", label: "Connect the React learning page", detail: "用 API 替换当前完成次数的 localStorage 读写。" },
+      { id: "vertical-tests", label: "Add backend and frontend tests", detail: "覆盖保存、重复提交、读取和失败状态。" },
+    ],
+    links: [
+      { label: "OPEN LEARN PAGE SOURCE", url: "https://github.com/bruceche-cmu-F25/Daily_Asistant/blob/codex/react-fastapi-refactor/frontend/src/pages/LearnPage.tsx" },
+      { label: "FASTAPI TUTORIAL", url: "https://fastapi.tiangolo.com/tutorial/" },
+    ],
+  },
+  {
+    id: "backend",
+    step: "02",
+    title: "Reliable backend",
+    description: "把第一个功能重构成 route、service、repository 清晰分层的项目代码。",
+    result: "失败时也可预测",
+    missionTitle: "Refactor Learning Backend",
+    goal: "让业务规则不依赖 FastAPI route 或 SQLAlchemy session，代码更容易测试和修改。",
+    tasks: [
+      { id: "route-inventory", label: "Inventory route responsibilities", detail: "标出验证、业务规则和数据库操作目前分别在哪里。" },
+      { id: "service-layer", label: "Extract a learning service layer", detail: "把重复、日期和完成规则移出 HTTP 层。" },
+      { id: "repository-boundary", label: "Create a repository boundary", detail: "让 service 不直接拼 SQLAlchemy 查询。" },
+      { id: "failure-paths", label: "Add typed errors and structured logs", detail: "覆盖数据库失败、非法输入和不存在记录。" },
+      { id: "backend-tests", label: "Test service and API boundaries", detail: "分别写快速 unit tests 与真实 integration tests。" },
+    ],
+    links: [
+      { label: "OPEN BACKEND SOURCE", url: "https://github.com/bruceche-cmu-F25/Daily_Asistant/tree/codex/react-fastapi-refactor/backend/daily_dashboard" },
+      { label: "COSMIC PYTHON", url: "https://www.cosmicpython.com/book/preface" },
+    ],
+  },
+  {
+    id: "quality",
+    step: "03",
+    title: "Ship quality",
+    description: "让项目在新机器和每次 push 上都能被自动安装、检查和验证。",
+    result: "别人能够接手",
+    missionTitle: "Python Quality Gate",
+    goal: "把“在我电脑上能跑”升级成可安装、可检查、有 CI 证明的工程项目。",
+    tasks: [
+      { id: "pyproject", label: "Create a production pyproject.toml", detail: "统一 package metadata、dependencies 和开发工具配置。" },
+      { id: "ruff", label: "Add Ruff lint and format checks", detail: "先修完现有问题，再让新问题阻断提交。" },
+      { id: "typing", label: "Add a Python type-check command", detail: "覆盖 service、repository 和 API 边界。" },
+      { id: "github-actions", label: "Run tests and checks in GitHub Actions", detail: "每次 push 自动安装、lint、typecheck 和 pytest。" },
+      { id: "runbook", label: "Write the one-command project runbook", detail: "README 记录安装、迁移、启动、测试和常见故障。" },
+    ],
+    links: [
+      { label: "PYTHON PACKAGING", url: "https://packaging.python.org/en/latest/tutorials/packaging-projects/" },
+      { label: "GITHUB ACTIONS", url: "https://docs.github.com/en/actions/tutorials/build-and-test-code/python" },
+    ],
+  },
 ] as const;
+
+const emptyProjectProgress: ProjectProgress = { slice: [], backend: [], quality: [] };
+const projectRepoUrl = "https://github.com/bruceche-cmu-F25/Daily_Asistant/tree/codex/react-fastapi-refactor";
 
 function localDate() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -119,6 +182,21 @@ function readProgress(): LearningProgress {
   }
 }
 
+function readProjectProgress(): ProjectProgress {
+  try {
+    const raw = learningStorage()?.getItem(PROJECT_GYM_STORAGE_KEY);
+    if (!raw) return emptyProjectProgress;
+    const parsed = JSON.parse(raw) as Partial<Record<ProjectId, unknown>>;
+    return {
+      slice: Array.isArray(parsed.slice) ? parsed.slice.filter((item): item is string => typeof item === "string") : [],
+      backend: Array.isArray(parsed.backend) ? parsed.backend.filter((item): item is string => typeof item === "string") : [],
+      quality: Array.isArray(parsed.quality) ? parsed.quality.filter((item): item is string => typeof item === "string") : [],
+    };
+  } catch {
+    return emptyProjectProgress;
+  }
+}
+
 function learningStreak(progress: LearningProgress, today: string) {
   const studied = new Set([...progress.javascript.sessions, ...progress.typescript.sessions]);
   const cursor = new Date(`${today}T12:00:00`);
@@ -133,16 +211,23 @@ function learningStreak(progress: LearningProgress, today: string) {
 export function LearnPage() {
   const [activeId, setActiveId] = useState<CourseId>("javascript");
   const [progress, setProgress] = useState<LearningProgress>(readProgress);
+  const [activeProjectId, setActiveProjectId] = useState<ProjectId>("slice");
+  const [projectProgress, setProjectProgress] = useState<ProjectProgress>(readProjectProgress);
   const today = localDate();
   const activeCourse = courses[activeId];
   const doneToday = progress[activeId].sessions.includes(today);
   const sessionsToday = (Object.keys(courses) as CourseId[]).filter((id) => progress[id].sessions.includes(today)).length;
   const totalSessions = progress.javascript.sessions.length + progress.typescript.sessions.length;
   const streak = useMemo(() => learningStreak(progress, today), [progress, today]);
+  const activeProject = projectLadder.find((item) => item.id === activeProjectId) ?? projectLadder[0];
 
   useEffect(() => {
     learningStorage()?.setItem(STORAGE_KEY, JSON.stringify(progress));
   }, [progress]);
+
+  useEffect(() => {
+    learningStorage()?.setItem(PROJECT_GYM_STORAGE_KEY, JSON.stringify(projectProgress));
+  }, [projectProgress]);
 
   const toggleToday = () => {
     setProgress((current) => {
@@ -153,6 +238,16 @@ export function LearnPage() {
           ...current[activeId],
           sessions: sessions.includes(today) ? sessions.filter((date) => date !== today) : [...sessions, today],
         },
+      };
+    });
+  };
+
+  const toggleProjectTask = (taskId: string) => {
+    setProjectProgress((current) => {
+      const completed = current[activeProjectId];
+      return {
+        ...current,
+        [activeProjectId]: completed.includes(taskId) ? completed.filter((id) => id !== taskId) : [...completed, taskId],
       };
     });
   };
@@ -256,9 +351,37 @@ export function LearnPage() {
         <p className="project-gym-intro">不要再造三个只能展示首页的 toy project。每周在这个代码库交付一个完整切片，同时练 Python 设计、数据库、测试、前端集成和 Git。</p>
         <div className="project-ladder">
           {projectLadder.map((item) => (
-            <article key={item.step}><span>{item.step}</span><h3>{item.title}</h3><p>{item.description}</p><small>DONE WHEN · {item.result}</small></article>
+            <button className={activeProjectId === item.id ? "active" : ""} type="button" aria-pressed={activeProjectId === item.id} onClick={() => setActiveProjectId(item.id)} key={item.step}>
+              <span>{item.step}</span><h3>{item.title}</h3><p>{item.description}</p>
+              <small>{projectProgress[item.id].length}/{item.tasks.length} TASKS · SELECT →</small>
+            </button>
           ))}
         </div>
+        <section className="project-mission" aria-labelledby="active-project-mission">
+          <header>
+            <div><p>ACTIVE MISSION · {activeProject.step}</p><h3 id="active-project-mission">{activeProject.missionTitle}</h3><span>{activeProject.goal}</span></div>
+            <strong>{projectProgress[activeProject.id].length}/{activeProject.tasks.length}<small>completed</small></strong>
+          </header>
+          <div className="project-mission-grid">
+            <div className="project-checklist">
+              {activeProject.tasks.map((task) => {
+                const checked = projectProgress[activeProject.id].includes(task.id);
+                return (
+                  <label className={checked ? "checked" : ""} key={task.id}>
+                    <input type="checkbox" aria-label={task.label} checked={checked} onChange={() => toggleProjectTask(task.id)} />
+                    <span><b>{task.label}</b><small>{task.detail}</small></span>
+                  </label>
+                );
+              })}
+            </div>
+            <aside>
+              <p>CODE + REFERENCES</p>
+              <a href={projectRepoUrl} target="_blank" rel="noopener noreferrer">OPEN PROJECT REPO ↗</a>
+              {activeProject.links.map((link) => <a href={link.url} target="_blank" rel="noopener noreferrer" key={link.url}>{link.label} ↗</a>)}
+              <span>完成状态只保存在这台 Mac。先完成 01，再进入 02 和 03。</span>
+            </aside>
+          </div>
+        </section>
         <div className="project-definition">
           <b>PROJECT DEFINITION OF DONE</b>
           <span>清晰目录</span><span>类型和验证</span><span>pytest</span><span>错误处理</span><span>README</span><span>CI 通过</span><span>可演示结果</span>

@@ -113,6 +113,18 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /JavaScript Foundations/ })).toHaveTextContent("1 SESSIONS");
   });
 
+  it("turns the Python project gym into actionable saved missions", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Learning Progress API" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /OPEN PROJECT REPO/ })).toHaveAttribute("href", "https://github.com/bruceche-cmu-F25/Daily_Asistant/tree/codex/react-fastapi-refactor");
+    const task = screen.getByRole("checkbox", { name: "Design the learning session API contract" });
+    fireEvent.click(task);
+    expect(task).toBeChecked();
+    expect(window.localStorage.getItem("daily-dashboard:project-gym:v1")).toContain("api-contract");
+    fireEvent.click(screen.getByRole("button", { name: /Reliable backend/ }));
+    expect(screen.getByRole("heading", { name: "Refactor Learning Backend" })).toBeInTheDocument();
+  });
+
   it("asks for the solution only after the user finishes the problem", async () => {
     render(<MemoryRouter initialEntries={["/neetcode"]}><App /></MemoryRouter>);
     expect(screen.queryByLabelText("Solution is required to mark Solved")).not.toBeInTheDocument();
