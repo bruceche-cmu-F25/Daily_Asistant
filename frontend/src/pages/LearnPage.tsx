@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-type CourseId = "react" | "typescript";
+type CourseId = "javascript" | "typescript";
+type LegacyCourseId = CourseId | "react";
 
 type CourseProgress = {
   sessions: string[];
@@ -11,22 +12,22 @@ type LearningProgress = Record<CourseId, CourseProgress>;
 
 const STORAGE_KEY = "daily-dashboard:learning-progress:v1";
 const emptyProgress: LearningProgress = {
-  react: { sessions: [], note: "" },
+  javascript: { sessions: [], note: "" },
   typescript: { sessions: [], note: "" },
 };
 
 const courses = {
-  react: {
-    mark: "RE",
-    title: "React + JavaScript",
+  javascript: {
+    mark: "JS",
+    title: "JavaScript Foundations",
     provider: "freeCodeCamp.org",
-    description: "组件、props、state、hooks，并把每一段知识用在真实项目里。",
-    embedUrl: "https://www.youtube-nocookie.com/embed/bMknfKXIFA8?rel=0",
-    primaryUrl: "https://www.freecodecamp.org/learn/front-end-development-libraries/#react",
-    primaryLabel: "OPEN FCC CHALLENGES",
-    secondaryUrl: "https://react.dev/learn",
-    secondaryLabel: "REACT DOCS",
-    proof: "在 Daily Assistant 或 portfolio 里完成一个可演示的 React 组件并提交 commit。",
+    description: "先用项目式挑战掌握变量、函数、数组、对象、DOM 和算法基础。",
+    embedUrl: "https://www.youtube-nocookie.com/embed/jS4aFq5-91M?rel=0",
+    primaryUrl: "https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures-v8/",
+    primaryLabel: "OPEN FCC JAVASCRIPT",
+    secondaryUrl: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
+    secondaryLabel: "MDN JS GUIDE",
+    proof: "不看答案独立完成今天的 freeCodeCamp challenge，再用自己的话解释核心概念。",
   },
   typescript: {
     mark: "TS",
@@ -63,11 +64,12 @@ function readProgress(): LearningProgress {
   try {
     const raw = learningStorage()?.getItem(STORAGE_KEY);
     if (!raw) return emptyProgress;
-    const parsed = JSON.parse(raw) as Partial<Record<CourseId, Partial<CourseProgress>>>;
+    const parsed = JSON.parse(raw) as Partial<Record<LegacyCourseId, Partial<CourseProgress>>>;
+    const javascript = parsed.javascript ?? parsed.react;
     return {
-      react: {
-        sessions: Array.isArray(parsed.react?.sessions) ? parsed.react.sessions.filter((item): item is string => typeof item === "string") : [],
-        note: typeof parsed.react?.note === "string" ? parsed.react.note : "",
+      javascript: {
+        sessions: Array.isArray(javascript?.sessions) ? javascript.sessions.filter((item): item is string => typeof item === "string") : [],
+        note: typeof javascript?.note === "string" ? javascript.note : "",
       },
       typescript: {
         sessions: Array.isArray(parsed.typescript?.sessions) ? parsed.typescript.sessions.filter((item): item is string => typeof item === "string") : [],
@@ -80,7 +82,7 @@ function readProgress(): LearningProgress {
 }
 
 function learningStreak(progress: LearningProgress, today: string) {
-  const studied = new Set([...progress.react.sessions, ...progress.typescript.sessions]);
+  const studied = new Set([...progress.javascript.sessions, ...progress.typescript.sessions]);
   const cursor = new Date(`${today}T12:00:00`);
   let streak = 0;
   while (studied.has(cursor.toISOString().slice(0, 10))) {
@@ -91,13 +93,13 @@ function learningStreak(progress: LearningProgress, today: string) {
 }
 
 export function LearnPage() {
-  const [activeId, setActiveId] = useState<CourseId>("react");
+  const [activeId, setActiveId] = useState<CourseId>("javascript");
   const [progress, setProgress] = useState<LearningProgress>(readProgress);
   const today = localDate();
   const activeCourse = courses[activeId];
   const doneToday = progress[activeId].sessions.includes(today);
   const sessionsToday = (Object.keys(courses) as CourseId[]).filter((id) => progress[id].sessions.includes(today)).length;
-  const totalSessions = progress.react.sessions.length + progress.typescript.sessions.length;
+  const totalSessions = progress.javascript.sessions.length + progress.typescript.sessions.length;
   const streak = useMemo(() => learningStreak(progress, today), [progress, today]);
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export function LearnPage() {
         <div>
           <p className="eyebrow">LEARN / BUILD / PROVE</p>
           <h1>Learning<br /><span>Lab</span></h1>
-          <p>目标不是“看完课程”，而是每天学一小段、写一点代码，再把成果变成可以在面试里展示的证据。</p>
+          <p>先完成 freeCodeCamp JavaScript 主线，再用 TypeScript 加强工程能力。每天学一小段、写一点代码，并留下可以在面试里展示的证据。</p>
           <span className="learn-local">本机保存进度 · 不上传学习笔记</span>
         </div>
         <div className="learn-stats" aria-label="Learning summary">
@@ -188,7 +190,7 @@ export function LearnPage() {
         <div className="learning-resource-row">
           <a href={activeCourse.primaryUrl} target="_blank" rel="noopener noreferrer">{activeCourse.primaryLabel} ↗</a>
           <a href={activeCourse.secondaryUrl} target="_blank" rel="noopener noreferrer">{activeCourse.secondaryLabel} ↗</a>
-          {activeId === "react" && <p>freeCodeCamp 挑战站禁止第三方 iframe；上方嵌入的是 freeCodeCamp 官方 React 视频，挑战练习请用按钮打开原站。</p>}
+          {activeId === "javascript" && <p>freeCodeCamp 挑战站禁止第三方 iframe；上方嵌入的是 freeCodeCamp 官方 JavaScript 视频，动手练习请用按钮打开原站。</p>}
         </div>
       </section>
 

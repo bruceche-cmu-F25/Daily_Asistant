@@ -15,7 +15,7 @@ export const dashboardResources: DashboardResource[] = [
   { id: "gmail", title: "Gmail", subtitle: "Inbox / 邮件", url: "https://mail.google.com/mail/u/0/#inbox", category: "daily", mark: "M", accent: "red", priority: true },
   { id: "leetcode", title: "LeetCode", subtitle: "Problemset / 保持手感", url: "https://leetcode.com/problemset/", category: "daily", mark: "LC", accent: "amber", priority: true },
   { id: "neetcode", title: "NeetCode", subtitle: "Roadmap + patterns", url: "https://neetcode.io/roadmap", category: "daily", mark: "NC", accent: "green", priority: true },
-  { id: "freecodecamp", title: "freeCodeCamp React", subtitle: "React + JavaScript course", url: "https://www.freecodecamp.org/learn/front-end-development-libraries/#react", category: "daily", mark: "fC", accent: "purple", priority: true },
+  { id: "freecodecamp", title: "freeCodeCamp JavaScript", subtitle: "Algorithms + data structures", url: "https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures-v8/", category: "daily", mark: "JS", accent: "purple", priority: true },
   { id: "jobright", title: "JobRight", subtitle: "Recommendations / 每天先刷", url: "https://jobright.ai/jobs/recommend", category: "daily", mark: "JR", accent: "red", priority: true },
   { id: "notion", title: "This Week", subtitle: "Notion · 变得更强", url: "https://www.notion.so/35ea5189545c80cfa8c3c910e0265817?source=copy_link", category: "daily", mark: "N", accent: "green", priority: true },
   { id: "abdul-bari", title: "DSA Video", subtitle: "Abdul Bari 算法课", url: "https://www.youtube.com/playlist?list=PLDN4rrl48XKpZkf03iYFl-O29szjTrs_O", category: "daily", mark: "▶", accent: "red", priority: true },
