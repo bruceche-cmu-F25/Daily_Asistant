@@ -93,21 +93,24 @@ describe("App", () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("LearningLab");
     expect(screen.getByTitle("JavaScript Foundations course player")).toHaveAttribute("src", expect.stringContaining("jS4aFq5-91M"));
+    expect(screen.getByRole("link", { name: /JavaScript V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/javascript-v9/");
+    expect(screen.getByRole("link", { name: /Front End Development Libraries V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/front-end-development-libraries-v9/");
+    expect(screen.getByRole("link", { name: /FastAPI Tutorial/ })).toHaveAttribute("href", "https://fastapi.tiangolo.com/tutorial/");
+    expect(screen.queryByText(/One useful note/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Advanced TypeScript/ }));
     expect(screen.getByTitle("Advanced TypeScript course player")).toHaveAttribute("src", expect.stringContaining("PLIvujZeVDLMx040"));
-    fireEvent.change(screen.getByLabelText("Advanced TypeScript learning note"), { target: { value: "Generics preserve relationships between types." } });
     fireEvent.click(screen.getByRole("button", { name: /MARK TODAY DONE/ }));
     expect(screen.getByRole("button", { name: "✓ DONE TODAY / 已完成" })).toBeInTheDocument();
-    expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("Generics preserve relationships");
+    expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("typescript");
   });
 
   it("migrates the previous React learning record into the JavaScript track", async () => {
     window.localStorage.setItem("daily-dashboard:learning-progress:v1", JSON.stringify({
-      react: { sessions: ["2026-07-15"], note: "A saved note from the first learning-page version." },
-      typescript: { sessions: [], note: "" },
+      react: { sessions: ["2026-07-15"] },
+      typescript: { sessions: [] },
     }));
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByLabelText("JavaScript Foundations learning note")).toHaveValue("A saved note from the first learning-page version.");
+    expect(await screen.findByRole("button", { name: /JavaScript Foundations/ })).toHaveTextContent("1 SESSIONS");
   });
 
   it("asks for the solution only after the user finishes the problem", async () => {

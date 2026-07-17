@@ -5,15 +5,14 @@ type LegacyCourseId = CourseId | "react";
 
 type CourseProgress = {
   sessions: string[];
-  note: string;
 };
 
 type LearningProgress = Record<CourseId, CourseProgress>;
 
 const STORAGE_KEY = "daily-dashboard:learning-progress:v1";
 const emptyProgress: LearningProgress = {
-  javascript: { sessions: [], note: "" },
-  typescript: { sessions: [], note: "" },
+  javascript: { sessions: [] },
+  typescript: { sessions: [] },
 };
 
 const courses = {
@@ -23,7 +22,7 @@ const courses = {
     provider: "freeCodeCamp.org",
     description: "先用项目式挑战掌握变量、函数、数组、对象、DOM 和算法基础。",
     embedUrl: "https://www.youtube-nocookie.com/embed/jS4aFq5-91M?rel=0",
-    primaryUrl: "https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures-v8/",
+    primaryUrl: "https://www.freecodecamp.org/learn/javascript-v9/",
     primaryLabel: "OPEN FCC JAVASCRIPT",
     secondaryUrl: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
     secondaryLabel: "MDN JS GUIDE",
@@ -42,6 +41,47 @@ const courses = {
     proof: "把今天学到的类型模式用到一个现有组件，确保 typecheck 通过并提交 commit。",
   },
 } as const;
+
+const learningResourceGroups = [
+  {
+    eyebrow: "START HERE",
+    title: "freeCodeCamp path",
+    description: "先打牢 JavaScript，再进入前端库、后端 API 和数据库。",
+    resources: [
+      { mark: "JS", title: "JavaScript V9", provider: "freeCodeCamp", description: "项目式练习 JavaScript 核心语法、DOM、算法和数据结构。", url: "https://www.freecodecamp.org/learn/javascript-v9/" },
+      { mark: "FE", title: "Front End Development Libraries V9", provider: "freeCodeCamp", description: "继续学习 React、状态管理和现代前端组件开发。", url: "https://www.freecodecamp.org/learn/front-end-development-libraries-v9/" },
+      { mark: "API", title: "Back End Development and APIs", provider: "freeCodeCamp", description: "理解 API、Node、Express 和后端接口的基本约定。", url: "https://www.freecodecamp.org/learn/back-end-development-and-apis/" },
+      { mark: "DB", title: "Relational Database", provider: "freeCodeCamp", description: "练习 SQL、PostgreSQL、Shell、Git 和数据库项目。", url: "https://www.freecodecamp.org/learn/relational-database/" },
+    ],
+  },
+  {
+    eyebrow: "PYTHON ENGINEERING",
+    title: "Build production habits",
+    description: "把会写 Python 升级成会组织、测试、交付 Python 项目。",
+    resources: [
+      { mark: "FA", title: "FastAPI Tutorial", provider: "Official docs", description: "沿官方教程完成验证、依赖注入、数据库、测试和部署。", url: "https://fastapi.tiangolo.com/tutorial/" },
+      { mark: "PT", title: "pytest", provider: "Official docs", description: "从单元测试走到 fixtures、参数化和集成测试。", url: "https://docs.pytest.org/en/stable/getting-started.html" },
+      { mark: "PKG", title: "Packaging Python Projects", provider: "Python Packaging Authority", description: "掌握 src layout、pyproject.toml、构建和发布。", url: "https://packaging.python.org/en/latest/tutorials/packaging-projects/" },
+      { mark: "ARCH", title: "Architecture Patterns with Python", provider: "Cosmic Python · free book", description: "通过 repository、service layer、unit of work 学大型 Python 代码组织。", url: "https://www.cosmicpython.com/book/preface" },
+      { mark: "CI", title: "Build and test Python", provider: "GitHub Actions", description: "让每次 push 自动运行 Python 测试、lint 和构建。", url: "https://docs.github.com/en/actions/tutorials/build-and-test-code/python" },
+    ],
+  },
+  {
+    eyebrow: "PROJECT PRACTICE",
+    title: "Learn by shipping",
+    description: "需要新项目灵感时再来这里；主项目仍然是 Daily Assistant。",
+    resources: [
+      { mark: "FS", title: "Full Stack Open", provider: "University of Helsinki", description: "完整练习 React、REST API、测试、TypeScript 和 CI。", url: "https://fullstackopen.com/en/" },
+      { mark: "PBL", title: "Project Based Learning", provider: "GitHub", description: "按语言挑选从零构建应用的教程，Python 和 JavaScript 都有。", url: "https://github.com/practical-tutorials/project-based-learning" },
+    ],
+  },
+] as const;
+
+const projectLadder = [
+  { step: "01", title: "Vertical slice", description: "在 Daily Assistant 做一个真实功能：React 页面、FastAPI endpoint、SQLite 持久化和测试一起完成。", result: "用户能看到并使用" },
+  { step: "02", title: "Reliable backend", description: "把业务逻辑从 route 拆到 service/repository，补输入验证、错误处理、日志和 integration tests。", result: "失败时也可预测" },
+  { step: "03", title: "Ship quality", description: "补 pyproject.toml、类型检查、pytest、README 和 GitHub Actions，让新环境可以一条命令运行。", result: "别人能够接手" },
+] as const;
 
 function localDate() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -69,11 +109,9 @@ function readProgress(): LearningProgress {
     return {
       javascript: {
         sessions: Array.isArray(javascript?.sessions) ? javascript.sessions.filter((item): item is string => typeof item === "string") : [],
-        note: typeof javascript?.note === "string" ? javascript.note : "",
       },
       typescript: {
         sessions: Array.isArray(parsed.typescript?.sessions) ? parsed.typescript.sessions.filter((item): item is string => typeof item === "string") : [],
-        note: typeof parsed.typescript?.note === "string" ? parsed.typescript.note : "",
       },
     };
   } catch {
@@ -119,21 +157,14 @@ export function LearnPage() {
     });
   };
 
-  const saveNote = (note: string) => {
-    setProgress((current) => ({
-      ...current,
-      [activeId]: { ...current[activeId], note },
-    }));
-  };
-
   return (
     <main className="learn-page">
       <section className="panel learn-hero">
         <div>
           <p className="eyebrow">LEARN / BUILD / PROVE</p>
           <h1>Learning<br /><span>Lab</span></h1>
-          <p>先完成 freeCodeCamp JavaScript 主线，再用 TypeScript 加强工程能力。每天学一小段、写一点代码，并留下可以在面试里展示的证据。</p>
-          <span className="learn-local">本机保存进度 · 不上传学习笔记</span>
+          <p>先完成 freeCodeCamp JavaScript V9，再进入 Front End Development Libraries。Python 不再只练语法，而是通过 Daily Assistant 练完整项目交付。</p>
+          <span className="learn-local">本机只保存完成次数</span>
         </div>
         <div className="learn-stats" aria-label="Learning summary">
           <div><b>{sessionsToday.toString().padStart(2, "0")}</b><span>sessions today</span></div>
@@ -190,26 +221,52 @@ export function LearnPage() {
         <div className="learning-resource-row">
           <a href={activeCourse.primaryUrl} target="_blank" rel="noopener noreferrer">{activeCourse.primaryLabel} ↗</a>
           <a href={activeCourse.secondaryUrl} target="_blank" rel="noopener noreferrer">{activeCourse.secondaryLabel} ↗</a>
-          {activeId === "javascript" && <p>freeCodeCamp 挑战站禁止第三方 iframe；上方嵌入的是 freeCodeCamp 官方 JavaScript 视频，动手练习请用按钮打开原站。</p>}
+          {activeId === "javascript" && <p>freeCodeCamp 挑战站禁止第三方 iframe；上方视频用于讲解，真正的主线练习从 JavaScript V9 原站进入。</p>}
         </div>
       </section>
 
-      <section className="panel learn-section learning-notes" aria-labelledby="learning-notes-title">
+      <section className="panel learn-section learning-library" aria-labelledby="learning-library-title">
         <div className="learn-heading">
-          <div><p className="eyebrow">03 / RETAIN</p><h2 id="learning-notes-title">One useful note / 今天记住什么</h2></div>
-          <span>保存在这台 Mac 的浏览器</span>
+          <div><p className="eyebrow">03 / COURSE + REFERENCE LIBRARY</p><h2 id="learning-library-title">Learning links / 学习入口</h2></div>
+          <span>按顺序学，不需要同时打开</span>
         </div>
-        <textarea
-          value={progress[activeId].note}
-          onChange={(event) => saveNote(event.target.value)}
-          aria-label={`${activeCourse.title} learning note`}
-          placeholder="用自己的话写：今天学到了什么？它能在哪个项目里使用？"
-          rows={5}
-        />
+        <div className="learning-resource-groups">
+          {learningResourceGroups.map((group) => (
+            <section className="learning-resource-group" aria-label={group.title} key={group.title}>
+              <header><p>{group.eyebrow}</p><h3>{group.title}</h3><span>{group.description}</span></header>
+              <div className="learning-link-grid">
+                {group.resources.map((resource) => (
+                  <a href={resource.url} target="_blank" rel="noopener noreferrer" key={resource.url}>
+                    <span>{resource.mark}</span>
+                    <div><b>{resource.title}</b><small>{resource.provider}</small><p>{resource.description}</p></div>
+                    <i>↗</i>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel learn-section project-gym" aria-labelledby="project-gym-title">
+        <div className="learn-heading">
+          <div><p className="eyebrow">04 / PROJECT-LEVEL PRACTICE</p><h2 id="project-gym-title">Python project gym / 项目级训练</h2></div>
+          <span>主训练场：Daily Assistant</span>
+        </div>
+        <p className="project-gym-intro">不要再造三个只能展示首页的 toy project。每周在这个代码库交付一个完整切片，同时练 Python 设计、数据库、测试、前端集成和 Git。</p>
+        <div className="project-ladder">
+          {projectLadder.map((item) => (
+            <article key={item.step}><span>{item.step}</span><h3>{item.title}</h3><p>{item.description}</p><small>DONE WHEN · {item.result}</small></article>
+          ))}
+        </div>
+        <div className="project-definition">
+          <b>PROJECT DEFINITION OF DONE</b>
+          <span>清晰目录</span><span>类型和验证</span><span>pytest</span><span>错误处理</span><span>README</span><span>CI 通过</span><span>可演示结果</span>
+        </div>
       </section>
 
       <section className="panel learn-section career-loop" aria-labelledby="career-loop-title">
-        <div className="learn-heading"><div><p className="eyebrow">04 / TURN LEARNING INTO SIGNAL</p><h2 id="career-loop-title">Job-ready loop / 让学习帮助求职</h2></div></div>
+        <div className="learn-heading"><div><p className="eyebrow">05 / TURN LEARNING INTO SIGNAL</p><h2 id="career-loop-title">Job-ready loop / 让学习帮助求职</h2></div></div>
         <div className="career-loop-grid">
           <article><span>01</span><b>Learn</b><p>每天只学一个可复述的概念。</p></article>
           <article><span>02</span><b>Build</b><p>当天放进 Daily Assistant 或 portfolio。</p></article>
