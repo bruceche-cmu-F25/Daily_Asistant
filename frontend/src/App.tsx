@@ -5,6 +5,7 @@ import { loadDashboard, loadNeetCode } from "./api";
 import { BrandGlyph, brandIdentity } from "./components/BrandLogo";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
+import { LearnPage } from "./pages/LearnPage";
 import { NeetCodePage } from "./pages/NeetCodePage";
 import { dashboardResources, type DashboardResource } from "./resources";
 import type { DashboardSnapshot, NeetCodeSnapshot, Problem } from "./types";
@@ -47,6 +48,7 @@ const searchableSections = [
   { title: "Today", subtitle: "Todo, calendar and quick launch", path: "/#today-queue" },
   { title: "NeetCode 150", subtitle: "Roadmap, workspace and history", path: "/neetcode" },
   { title: "Job Hunt", subtitle: "Application platforms and curated lists", path: "/#job-resources" },
+  { title: "Learning Lab", subtitle: "React and TypeScript daily learning", path: "/learn" },
   { title: "Study Resources", subtitle: "Courses and project-based learning", path: "/#study-resources" },
   { title: "Discover", subtitle: "Tech news and events", path: "/discover" },
 ];
@@ -127,6 +129,7 @@ export function App() {
         <nav aria-label="Primary navigation">
           <a href="/#today">TODAY</a>
           <a href="/#plan">PLAN</a>
+          <NavLink to="/learn">LEARN</NavLink>
           <NavLink to="/neetcode">NEETCODE</NavLink>
           <a href="/neetcode#history">HISTORY</a>
           <a href="/#jobs">JOBS</a>
@@ -177,6 +180,7 @@ export function App() {
       {error && <div className="error-banner">{error}</div>}
       <Routes>
         <Route path="/" element={<HomePage dashboard={dashboard} />} />
+        <Route path="/learn" element={<LearnPage />} />
         <Route path="/neetcode" element={<NeetCodePage snapshot={snapshot} onRefresh={refreshSnapshot} />} />
         <Route path="/discover" element={<DiscoverPage dashboard={dashboard} />} />
       </Routes>

@@ -58,7 +58,8 @@ export function HomePage({ dashboard }: Props) {
           <p className="legacy-hero-lede">把今天真正要做的事情放到同一个控制台：先完成 Calendar，再推进投递，最后沿着本周路线学习。</p>
           <div className="legacy-hero-actions" aria-label="Primary actions">
             <Link className="legacy-primary-action solve" to="/neetcode"><span>01</span><b>去刷题</b><small>NEETCODE 150 →</small></Link>
-            <Link className="legacy-primary-action discover" to="/discover"><span>02</span><b>看活动</b><small>NEWS + EVENTS →</small></Link>
+            <Link className="legacy-primary-action learn" to="/learn"><span>02</span><b>去学习</b><small>REACT + TYPESCRIPT →</small></Link>
+            <Link className="legacy-primary-action discover" to="/discover"><span>03</span><b>看活动</b><small>NEWS + EVENTS →</small></Link>
           </div>
           <p className="legacy-hero-meta">Generated {dashboard.generated_at ? dashboard.generated_at.replace("T", " ").slice(0, 16) : "waiting for first sync"} · <a href="https://www.notion.so/35ea5189545c80cfa8c3c910e0265817?source=copy_link" target="_blank" rel="noopener noreferrer">Notion / 变得更强</a>{dashboard.weekly_plan.url && <> · <a href={dashboard.weekly_plan.url} target="_blank" rel="noopener noreferrer">{dashboard.weekly_plan.title}</a></>}</p>
         </div>

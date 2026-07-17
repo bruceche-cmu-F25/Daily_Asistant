@@ -52,7 +52,10 @@ vi.mock("./api", () => ({
   saveTodo: () => Promise.resolve({ item_key: "", source: "", title: "", completed: true, updated_at: "" }),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 describe("App", () => {
   it("renders the local-first home shell", async () => {
@@ -61,6 +64,7 @@ describe("App", () => {
     expect(await screen.findByText(/Focus/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: /去刷题/ })).toHaveAttribute("href", "/neetcode");
+    expect(screen.getByRole("link", { name: /去学习/ })).toHaveAttribute("href", "/learn");
     expect(screen.getByRole("link", { name: /看活动/ })).toHaveAttribute("href", "/discover");
     expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
     expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
@@ -83,6 +87,18 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: /CMU Silicon Valley/ })).toHaveAttribute("href", "https://events.cmu.edu/sv/");
     expect(screen.getByRole("link", { name: /AI ships/ })).toHaveAttribute("href", "https://example.com/news");
     expect(screen.getByText(/只读发现/)).toBeInTheDocument();
+  });
+
+  it("renders embedded React and TypeScript learning tracks with local progress", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("LearningLab");
+    expect(screen.getByTitle("React + JavaScript course player")).toHaveAttribute("src", expect.stringContaining("bMknfKXIFA8"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced TypeScript/ }));
+    expect(screen.getByTitle("Advanced TypeScript course player")).toHaveAttribute("src", expect.stringContaining("PLIvujZeVDLMx040"));
+    fireEvent.change(screen.getByLabelText("Advanced TypeScript learning note"), { target: { value: "Generics preserve relationships between types." } });
+    fireEvent.click(screen.getByRole("button", { name: /MARK TODAY DONE/ }));
+    expect(screen.getByRole("button", { name: "✓ DONE TODAY / 已完成" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("Generics preserve relationships");
   });
 
   it("asks for the solution only after the user finishes the problem", async () => {
