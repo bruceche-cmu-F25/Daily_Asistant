@@ -115,6 +115,12 @@ describe("App", () => {
     expect(await screen.findByText("Daily")).toBeInTheDocument();
     expect(await screen.findByText(/Focus/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
+    expect(screen.getByRole("link", { name: "HOME" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "LEARN" })).toHaveAttribute("href", "/learn");
+    expect(screen.getByRole("link", { name: "APPLY" })).toHaveAttribute("href", "/applications");
+    expect(screen.getByRole("link", { name: "EVENTS" })).toHaveAttribute("href", "/discover");
+    expect(screen.queryByRole("link", { name: "HISTORY" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "JOBS" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /去刷题/ })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: /去学习/ })).toHaveAttribute("href", "/learn");
     expect(screen.getByRole("link", { name: /今日投递/ })).toHaveAttribute("href", "/applications");

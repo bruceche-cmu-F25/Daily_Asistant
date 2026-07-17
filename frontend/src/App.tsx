@@ -129,14 +129,11 @@ export function App() {
           <span>BRUCE / DAILY OS</span>
         </NavLink>
         <nav aria-label="Primary navigation">
-          <a href="/#today">TODAY</a>
-          <a href="/#plan">PLAN</a>
+          <NavLink to="/">HOME</NavLink>
           <NavLink to="/learn">LEARN</NavLink>
           <NavLink to="/neetcode">NEETCODE</NavLink>
-          <a href="/neetcode#history">HISTORY</a>
-          <a href="/#jobs">JOBS</a>
           <NavLink to="/applications">APPLY</NavLink>
-          <NavLink to="/discover">SIGNAL</NavLink>
+          <NavLink to="/discover">EVENTS</NavLink>
         </nav>
         <div className="global-search" role="search">
           <span aria-hidden="true">⌕</span>
