@@ -15,8 +15,9 @@ from sqlalchemy.orm import Session
 
 from .api_applications import application_dict, now_iso
 from .api_attempts import get_session
-from .legacy import PROJECT_ROOT, load_dashboard_snapshot
+from .legacy import PROJECT_ROOT
 from .models import JobApplication, JobLeadDecision
+from .snapshot import load_dashboard_snapshot
 
 
 router = APIRouter(prefix="/api/v1", tags=["job-leads"])
@@ -79,7 +80,11 @@ def list_job_leads(session: Session = Depends(get_session)) -> dict[str, Any]:
             "decision": decision.decision if decision else "pending",
             "application_id": decision.application_id if decision else None,
         })
-    return {"items": items, "refreshed_at": refreshed_at}
+    return {
+        "items": items,
+        "refreshed_at": refreshed_at,
+        "new_count": sum(1 for item in items if item.get("is_new_today")),
+    }
 
 
 @router.patch("/job-leads/{lead_key}")

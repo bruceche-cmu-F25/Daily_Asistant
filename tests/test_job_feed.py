@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 
-from job_feed import _job_key, parse_simplify_listings, parse_speedy_markdown, rank_and_dedupe  # noqa: E402
+from job_feed import _job_key, location_tier, mark_first_seen, parse_simplify_listings, parse_speedy_markdown, rank_and_dedupe  # noqa: E402
 
 
 PROFILE = {
@@ -84,6 +84,68 @@ class JobFeedTests(unittest.TestCase):
         direct = "https://jobs.ashbyhq.com/netic/job-123"
         embedded = "https://jobs.ashbyhq.com/netic/job-123/application?embed=true"
         self.assertEqual(_job_key(direct), _job_key(embedded))
+
+    def test_bay_area_city_coverage(self):
+        self.assertEqual(location_tier("Oakland, CA"), "bay_area")
+        self.assertEqual(location_tier("Redwood City, California"), "bay_area")
+        self.assertEqual(location_tier("Remote in USA"), "remote")
+        self.assertEqual(location_tier("Pittsburgh, PA"), "other_us")
+        self.assertEqual(location_tier(""), "unknown")
+
+    def test_bay_area_jobs_sort_before_higher_scoring_remote_jobs(self):
+        base = {
+            "company": "Example",
+            "role": "Software Engineer",
+            "url": "https://example.com/job",
+            "source": "test",
+            "track": "new_grad",
+            "category": "Software",
+            "posted_at": "2026-07-17",
+            "age_days": 0,
+            "is_big_tech": False,
+        }
+        bay_area = {
+            **base,
+            "key": "bay-area",
+            "location": "Berkeley, CA",
+            "age_days": 20,
+        }
+        remote = {
+            **base,
+            "key": "remote",
+            "role": "AI Software Engineer - New Grad 2027",
+            "location": "Remote in USA",
+        }
+
+        ranked = rank_and_dedupe([remote, bay_area], PROFILE)
+
+        self.assertEqual([item["key"] for item in ranked], ["bay-area", "remote"])
+        self.assertEqual(ranked[0]["location_tier"], "bay_area")
+
+    def test_first_seen_survives_refresh_and_marks_only_todays_roles(self):
+        previous = [{"key": "old", "first_seen_at": "2026-07-16T09:00:00-07:00"}]
+        current = [{"key": "old"}, {"key": "new"}]
+
+        marked = mark_first_seen(
+            current,
+            previous,
+            refreshed_at="2026-07-17T09:00:00-07:00",
+            previous_refreshed_at="2026-07-16T09:00:00-07:00",
+        )
+
+        self.assertEqual(marked[0]["first_seen_at"], "2026-07-16T09:00:00-07:00")
+        self.assertFalse(marked[0]["is_new_today"])
+        self.assertTrue(marked[1]["is_new_today"])
+
+    def test_existing_unannotated_feed_becomes_a_quiet_baseline(self):
+        marked = mark_first_seen(
+            [{"key": "existing"}],
+            [{"key": "existing"}],
+            refreshed_at="2026-07-17T09:00:00-07:00",
+            previous_refreshed_at="2026-07-17T08:00:00-07:00",
+        )
+
+        self.assertFalse(marked[0]["is_new_today"])
 
 
 if __name__ == "__main__":

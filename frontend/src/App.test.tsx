@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,7 +18,7 @@ vi.mock("./api", () => ({
     notion: [], jobs: [], news: [{ title: "AI ships", link: "https://example.com/news", snippet: "A useful signal." }],
     discover_events: [{ title: "Silicon Valley AI Builders", link: "https://luma.com/example", snippet: "Meet local AI builders in Mountain View.", source: "Luma" }],
     job_groups: {},
-    quick_actions: [{ title: "Gmail", subtitle: "Inbox / 邮件", url: "https://mail.google.com/mail/u/0/#inbox", kind: "hot" }],
+    quick_actions: [{ title: "Gmail", subtitle: "Inbox", url: "https://mail.google.com/mail/u/0/#inbox", kind: "hot" }],
     quiet_links: [{ title: "LinkedIn", url: "https://www.linkedin.com/in/chi-cheng921/", kind: "profile", label: "Profile" }],
     target_copy: "Target", target_copy_cn: "目标",
   }),
@@ -50,6 +50,36 @@ vi.mock("./api", () => ({
   createAttempt: () => Promise.resolve({ ok: true, attempt: {} }),
   loadTodos: () => Promise.resolve([]),
   saveTodo: () => Promise.resolve({ item_key: "", source: "", title: "", completed: true, updated_at: "" }),
+  loadLifeTasks: () => Promise.resolve([{
+    id: 51,
+    title: "Renew driver's license",
+    category: "admin",
+    due_at: "2026-08-02T10:30",
+    notes: "Bring proof of address.",
+    completed: false,
+    completed_at: null,
+    created_at: "2026-07-17T09:00:00-07:00",
+    updated_at: "2026-07-17T09:00:00-07:00",
+  }]),
+  createLifeTask: (payload: object) => Promise.resolve({ id: 52, completed: false, completed_at: null, created_at: "", updated_at: "", ...payload }),
+  updateLifeTask: (id: number, payload: object) => Promise.resolve({ id, title: "Renew driver's license", category: "admin", due_at: "2026-08-02T10:30", notes: "", completed: false, completed_at: null, created_at: "", updated_at: "", ...payload }),
+  deleteLifeTask: () => Promise.resolve(),
+  loadTripPlan: () => Promise.resolve({
+    id: 1,
+    title: "Japan 2026",
+    destination: "Tokyo, Japan",
+    start_date: "2026-09-10",
+    end_date: "2026-09-16",
+    notes: "Rail pass in wallet.",
+    stops: [
+      { id: "sensoji", title: "Senso-ji", location: "Senso-ji, Tokyo", visit_at: "2026-09-11T09:00", notes: "Arrive before crowds.", position: 0 },
+      { id: "shibuya", title: "Shibuya Sky", location: "Shibuya Sky, Tokyo", visit_at: "2026-09-11T18:00", notes: "Sunset ticket.", position: 1 },
+    ],
+    created_at: "2026-07-19T09:00:00-07:00",
+    updated_at: "2026-07-19T09:00:00-07:00",
+  }),
+  saveTripPlan: (payload: { stops: Array<Record<string, unknown>> }) => Promise.resolve({ id: 1, ...payload, stops: payload.stops.map((stop, index) => ({ id: stop.id || `stop-${index}`, position: index, ...stop })), created_at: "", updated_at: "" }),
+  deleteTripPlan: () => Promise.resolve(),
   loadApplications: () => Promise.resolve([{
     id: 12,
     company: "OpenAI",
@@ -59,6 +89,7 @@ vi.mock("./api", () => ({
     next_step: "Follow up with CMU alumnus",
     applied_at: "2026-07-15",
     follow_up_at: "2026-07-16",
+    deadline_at: null,
     contact_name: "Alex",
     contact_type: "alumni",
     contact_status: "contacted",
@@ -80,12 +111,16 @@ vi.mock("./api", () => ({
       category: "AI/ML",
       posted_at: "2026-07-17",
       age_days: 0,
+      first_seen_at: "2026-07-17T09:00:00-07:00",
+      is_new_today: true,
       is_big_tech: false,
+      location_tier: "bay_area",
       match_score: 96,
       match_reasons: ["2027 / early-career timing", "AI / agentic systems", "Bay Area / local"],
       decision: "pending",
       application_id: null,
     }],
+    new_count: 1,
   }),
   loadCandidateProfile: () => Promise.resolve({
     resume_version: "Chi Cheng-Resume-2026-May.pdf",
@@ -94,13 +129,43 @@ vi.mock("./api", () => ({
     target_roles: ["AI / Agentic Software Engineer"],
     resume_available: true,
   }),
+  loadApplicationSignals: () => Promise.resolve({
+    items: [{
+      id: 41,
+      source_message_id: "gmail-41",
+      sender: "recruiting@example.com",
+      subject: "OpenAI coding assessment",
+      received_at: "2026-07-17T10:00:00-07:00",
+      source_url: "https://mail.google.com/mail/#all/gmail-41",
+      signal_type: "oa",
+      company: "OpenAI",
+      role_hint: "Software Engineer",
+      summary: "OpenAI coding assessment",
+      suggested_stage: "oa",
+      suggested_next_step: "Complete the online assessment before the deadline.",
+      suggested_deadline_at: "2026-07-22",
+      application_id: 12,
+      confidence: 96,
+      status: "pending",
+      created_at: "2026-07-17T10:00:00-07:00",
+      updated_at: "2026-07-17T10:00:00-07:00",
+    }],
+    connection: {
+      adapter: "codex_gmail_bridge",
+      automatic: false,
+      last_import_at: null,
+      status: "not_connected",
+      detail: "Read-only bridge",
+    },
+  }),
+  decideApplicationSignal: () => Promise.resolve({ signal: {}, application: null }),
   setJobLeadDecision: (key: string, decision: string) => Promise.resolve({ key, decision }),
   markJobLeadApplied: () => Promise.resolve({
     lead: { key: "lead-netic-1", decision: "applied", application_id: 13 },
-    application: { id: 13, company: "Netic", role: "Agent Software Engineer - New Grad", job_url: "https://example.com/jobs/netic-1", stage: "applied", next_step: "Follow up if there is no response", applied_at: "2026-07-17", follow_up_at: "2026-07-24", contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "Chi Cheng-Resume-2026-May.pdf", notes: "Auto-imported", created_at: "", updated_at: "" },
+    application: { id: 13, company: "Netic", role: "Agent Software Engineer - New Grad", job_url: "https://example.com/jobs/netic-1", stage: "applied", next_step: "Follow up if there is no response", applied_at: "2026-07-17", follow_up_at: "2026-07-24", deadline_at: null, contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "Chi Cheng-Resume-2026-May.pdf", notes: "Auto-imported", created_at: "", updated_at: "" },
   }),
   createApplication: (payload: object) => Promise.resolve({ id: 13, ...payload, created_at: "2026-07-17T09:00:00-07:00", updated_at: "2026-07-17T09:00:00-07:00" }),
-  updateApplication: (id: number, payload: object) => Promise.resolve({ id, company: "OpenAI", role: "Software Engineer", job_url: "", stage: "applied", next_step: "", applied_at: null, follow_up_at: null, contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "", notes: "", created_at: "", updated_at: "", ...payload }),
+  updateApplication: (id: number, payload: object) => Promise.resolve({ id, company: "OpenAI", role: "Software Engineer", job_url: "", stage: "applied", next_step: "", applied_at: null, follow_up_at: null, deadline_at: null, contact_name: "", contact_type: "none", contact_status: "not_contacted", resume_version: "", notes: "", created_at: "", updated_at: "", ...payload }),
   deleteApplication: () => Promise.resolve(),
 }));
 
@@ -112,23 +177,85 @@ afterEach(() => {
 describe("App", () => {
   it("renders the local-first home shell", async () => {
     const { container } = render(<MemoryRouter><App /></MemoryRouter>);
-    expect(await screen.findByText("Daily")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "DailyAction" })).toBeInTheDocument();
     expect(await screen.findByText(/Focus/)).toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: "July 2026 calendar" })).toBeInTheDocument();
+    expect(container.querySelector('.legacy-calendar-day.past[data-day="14"]')).toBeInTheDocument();
+    expect(container.querySelector('.legacy-calendar-day.today[data-day="15"]')).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: "HOME" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "LEARN" })).toHaveAttribute("href", "/learn");
+    expect(screen.getByRole("link", { name: "PYTHON" })).toHaveAttribute("href", "/python");
+    expect(screen.getByRole("link", { name: "LIFE" })).toHaveAttribute("href", "/life");
     expect(screen.getByRole("link", { name: "APPLY" })).toHaveAttribute("href", "/applications");
     expect(screen.getByRole("link", { name: "EVENTS" })).toHaveAttribute("href", "/discover");
     expect(screen.queryByRole("link", { name: "HISTORY" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "JOBS" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /去刷题/ })).toHaveAttribute("href", "/neetcode");
-    expect(screen.getByRole("link", { name: /去学习/ })).toHaveAttribute("href", "/learn");
-    expect(screen.getByRole("link", { name: /今日投递/ })).toHaveAttribute("href", "/applications");
-    expect(screen.getByRole("link", { name: /看活动/ })).toHaveAttribute("href", "/discover");
+    expect(screen.getByRole("link", { name: /01Solve/ })).toHaveAttribute("href", "/neetcode");
+    expect(screen.getByRole("link", { name: /02Learn/ })).toHaveAttribute("href", "/learn");
+    expect(screen.getByRole("link", { name: /03Apply/ })).toHaveAttribute("href", "/applications");
+    expect(screen.getByRole("link", { name: /04Events/ })).toHaveAttribute("href", "/discover");
     expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
+    expect(screen.getByRole("link", { name: /printing/ })).toHaveAttribute("href", "https://mobile.eprintitsaas.com/app/add-files?locationid=657b709e3f26b41cad5395f5&domainname=sfpl");
     expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
     expect(container.querySelector('[data-brand-logo="gmail"] svg')).toBeInTheDocument();
     expect(container.querySelector('[data-brand-logo="linkedin"] svg')).toBeInTheDocument();
+
+    const closeModules = screen.getByRole("button", { name: "Close module sidebar" });
+    expect(closeModules).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(closeModules);
+    expect(screen.getByRole("button", { name: "Open module sidebar" })).toHaveAttribute("aria-expanded", "false");
+    expect(container.querySelector(".app-body")).toHaveClass("sidebar-closed");
+    expect(window.localStorage.getItem("daily-dashboard:module-sidebar:open")).toBe("false");
+  });
+
+  it("keeps personal life tasks on an isolated timeline", async () => {
+    const { container } = render(<MemoryRouter initialEntries={["/life"]}><App /></MemoryRouter>);
+    expect((await screen.findAllByText("Renew driver's license")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("region", { name: "Add life task" })).toBeInTheDocument();
+    const lifeTimeline = screen.getByRole("region", { name: "Life timeline" });
+    const lifeCalendar = screen.getByRole("grid", { name: "August 2026 life calendar" });
+    expect(lifeTimeline).toBeInTheDocument();
+    expect(lifeCalendar).toBeInTheDocument();
+    expect(screen.getByText("10:30 AM")).toBeInTheDocument();
+    expect(screen.getAllByText("Admin / 手续").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/No Calendar or Notion sync/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Task / 事项 *"), { target: { value: "Book dentist" } });
+    fireEvent.change(screen.getByLabelText("When / 什么时候"), { target: { value: "2026-08-01T09:00" } });
+    const notes = screen.getByLabelText("Notes / 备注（可选，可换行）");
+    fireEvent.change(notes, { target: { value: "Bring insurance card\nAsk about copay" } });
+    fireEvent.keyDown(notes, { key: "Enter", code: "Enter" });
+    expect(notes).toHaveValue("Bring insurance card\nAsk about copay");
+    fireEvent.submit(notes.closest("form")!);
+    expect(screen.queryByText("Book dentist")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "ADD TO LIFE →" }));
+    expect((await screen.findAllByText("Book dentist")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("9:00 AM").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Bring insurance card/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("SOMEDAY")).not.toBeInTheDocument();
+    const upcomingTitles = Array.from(container.querySelectorAll(".life-group"))
+      .find((group) => group.textContent?.includes("UPCOMING"))
+      ?.querySelectorAll(".life-task-card h3");
+    expect(Array.from(upcomingTitles ?? []).map((heading) => heading.textContent)).toEqual([
+      "Book dentist",
+      "Renew driver's license",
+    ]);
+    const tripPlanner = await screen.findByRole("region", { name: "Trip planner" });
+    expect(lifeTimeline).toContainElement(tripPlanner);
+    expect(lifeCalendar.compareDocumentPosition(tripPlanner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByLabelText("Trip name / 旅行名称 *")).toHaveValue("Japan 2026");
+    const tripMap = screen.getByTitle("Map for Senso-ji");
+    expect(tripMap).toHaveAttribute("src", expect.stringContaining("Senso-ji%2C%20Tokyo"));
+    fireEvent.click(screen.getByRole("button", { name: "DAY ROUTE" }));
+    const dayRouteMap = screen.getByTitle("Map for day route");
+    expect(dayRouteMap).toHaveAttribute("src", expect.stringContaining("output=embed"));
+    expect(dayRouteMap).toHaveAttribute("src", expect.stringContaining("saddr=Senso-ji%2C+Tokyo"));
+    expect(dayRouteMap).toHaveAttribute("src", expect.stringContaining("daddr=Shibuya+Sky%2C+Tokyo"));
+    fireEvent.click(screen.getByRole("button", { name: "Focus Shibuya Sky on map" }));
+    expect(screen.getByTitle("Map for Shibuya Sky")).toHaveAttribute("src", expect.stringContaining("Shibuya%20Sky%2C%20Tokyo"));
+    fireEvent.click(screen.getByRole("button", { name: "FULL ROUTE" }));
+    expect(screen.getByTitle("Map for full trip route")).toHaveAttribute("src", expect.stringContaining("output=embed"));
   });
 
   it("finds migrated resources in global search", async () => {
@@ -136,21 +263,170 @@ describe("App", () => {
     const search = screen.getByRole("searchbox", { name: "Global search" });
     fireEvent.change(search, { target: { value: "linkedin" } });
     expect(await screen.findByText(/Profile \+ job search/)).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "netflix" } });
+    expect(await screen.findByRole("button", { name: /Netflix Careers.*Official careers/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "官方招聘" } });
+    expect(await screen.findByRole("button", { name: /Google Careers.*Official careers/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "trip planner" } });
+    expect(await screen.findByRole("button", { name: /Life Queue.*trip planner/ })).toBeInTheDocument();
+  });
+
+  it("searches Python operations globally and opens the matching cheatsheet card", async () => {
+    render(<MemoryRouter><App /></MemoryRouter>);
+    const globalSearch = screen.getByRole("searchbox", { name: "Global search" });
+    fireEvent.change(globalSearch, { target: { value: "access dict" } });
+    const dictResult = await screen.findByRole("button", { name: /Access dict value.*访问 Dict/ });
+    fireEvent.click(dictResult);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("PythonReference");
+    const focusedCard = screen.getByRole("region", { name: "当前 Python 知识卡片" });
+    expect(within(focusedCard).getByRole("heading", { name: "Access dict value" })).toBeInTheDocument();
+    expect(within(focusedCard).getByText(/mapping\[key\]\s+\|\s+mapping\.get\(key, default\)/)).toBeInTheDocument();
+
+    const localSearch = screen.getByRole("searchbox", { name: "Search Python cheatsheet" });
+    fireEvent.change(localSearch, { target: { value: "add set" } });
+    const finder = screen.getByRole("region", { name: "Python 知识搜索" });
+    const addSetResult = within(finder).getByRole("link", { name: /Add to set/ });
+    expect(screen.queryByRole("heading", { name: "Access dict value" })).not.toBeInTheDocument();
+    expect(within(addSetResult).getByText(/values\.add\(item\)\s+\|\s+values\.update\(iterable\)/)).toBeInTheDocument();
+
+    fireEvent.change(globalSearch, { target: { value: "matrix bfs" } });
+    const gridResult = await screen.findByRole("button", { name: /Grid BFS shortest path.*Matrix/ });
+    fireEvent.click(gridResult);
+    expect(await screen.findByRole("heading", { name: "Grid BFS shortest path" })).toBeInTheDocument();
+    expect(localSearch).toHaveValue("");
+  });
+
+  it("covers official string modification and built-in container methods", async () => {
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("link", { name: /STRING METHODS.*All official str methods/ })).toHaveAttribute(
+      "href",
+      "https://docs.python.org/3/library/stdtypes.html#string-methods",
+    );
+    const search = screen.getByRole("searchbox", { name: "Search Python cheatsheet" });
+    const finder = screen.getByRole("region", { name: "Python 知识搜索" });
+    fireEvent.change(search, { target: { value: "string modification" } });
+    expect(within(finder).getByRole("link", { name: /Modify a string.*str 是 immutable/i })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "isnumeric" } });
+    expect(within(finder).getByRole("link", { name: /Test string contents/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "dict clear" } });
+    expect(within(finder).getByRole("link", { name: /Copy or clear a dict/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "issubset" } });
+    expect(within(finder).getByRole("link", { name: /Compare set relationships/ })).toBeInTheDocument();
+  });
+
+  it("provides a Chinese contents directory that links to Python cards", () => {
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    const directory = screen.getByRole("region", { name: "Python 中文知识目录" });
+    expect(within(directory).getByRole("heading", { name: "Contents" })).toBeInTheDocument();
+    expect(within(directory).getByRole("link", { name: /Assign & unpack/ })).toHaveAttribute("href", "/python#variables-unpack");
+  });
+
+  it("organizes every Python category into a two-track knowledge system", () => {
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    const system = screen.getByRole("region", { name: "Python 系统知识图谱" });
+    expect(within(system).getByRole("heading", { name: "Python Knowledge System" })).toBeInTheDocument();
+    expect(within(system).getAllByText("BUILD TRACK", { selector: "small" })).toHaveLength(3);
+    expect(within(system).getAllByText("SOLVE TRACK", { selector: "small" })).toHaveLength(3);
+    expect(system.querySelectorAll(".python-system-topic")).toHaveLength(15);
+    expect(within(system).getByText("Syntax", { selector: ".python-system-topic > summary b" }).closest("summary")).toHaveTextContent("7 cards");
+    expect(within(system).getByText("Project Engineering", { selector: ".python-system-topic > summary b" }).closest("summary")).toHaveTextContent("24 cards");
+  });
+
+  it("opens a compact card directory from each knowledge-system topic", () => {
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    const system = screen.getByRole("region", { name: "Python 系统知识图谱" });
+    const coreTrigger = within(system).getByLabelText("Open Core Patterns menu");
+    expect(coreTrigger).not.toBeNull();
+    fireEvent.click(coreTrigger);
+    const coreTopic = coreTrigger.closest("details")!;
+    expect(coreTopic).toHaveAttribute("open");
+    expect(within(coreTopic).getByRole("link", { name: /Flexible function parameters/ })).toHaveAttribute(
+      "href",
+      "/python#core-args-kwargs",
+    );
+    const fullDirectory = within(coreTopic).getByRole("link", { name: /View all Core Patterns cards/ });
+    expect(fullDirectory).toHaveAttribute(
+      "href",
+      "/python#python-directory-core-patterns",
+    );
+    fireEvent.click(fullDirectory);
+    return waitFor(() => expect(document.getElementById("python-directory-core-patterns")).toHaveAttribute("open"));
+  });
+
+  it("repositions the focused card on every directory direct-card navigation", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    const directory = screen.getByRole("region", { name: "Python 中文知识目录" });
+    const listSummaryLabel = within(directory).getAllByText("List").find((element) => element.closest("summary"));
+    expect(listSummaryLabel).toBeDefined();
+    fireEvent.click(listSummaryLabel as HTMLElement);
+    fireEvent.click(within(directory).getByRole("link", { name: /Add to list/ }));
+    expect(await screen.findByRole("heading", { name: "Add to list" })).toBeInTheDocument();
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    const callsAfterFirstNavigation = scrollIntoView.mock.calls.length;
+    const recent = screen.getByRole("region", { name: "最近查看的 Python 知识" });
+    fireEvent.click(within(recent).getByRole("link", { name: /Add to list/ }));
+    await waitFor(() => expect(scrollIntoView.mock.calls.length).toBeGreaterThan(callsAfterFirstNavigation));
+  });
+
+  it("searches Python knowledge in Chinese and supports the slash shortcut", async () => {
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    const search = screen.getByRole("searchbox", { name: "Search Python cheatsheet" });
+    fireEvent.keyDown(window, { key: "/" });
+    expect(search).toHaveFocus();
+    fireEvent.change(search, { target: { value: "读取字典" } });
+    const finder = screen.getByRole("region", { name: "Python 知识搜索" });
+    const result = within(finder).getByRole("link", { name: /Access dict value/ });
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    expect(result).toHaveClass("active");
+    fireEvent.keyDown(search, { key: "Enter" });
+    const focusedCard = await screen.findByRole("region", { name: "当前 Python 知识卡片" });
+    expect(within(focusedCard).getByRole("heading", { name: "Access dict value" })).toBeInTheDocument();
+    expect(search).toHaveValue("读取字典");
+  });
+
+  it("understands natural language, tolerates typos, and paginates category cards", () => {
+    render(<MemoryRouter initialEntries={["/python"]}><App /></MemoryRouter>);
+    expect(document.querySelectorAll(".python-cheat-card")).toHaveLength(0);
+    const search = screen.getByRole("searchbox", { name: "Search Python cheatsheet" });
+    const finder = screen.getByRole("region", { name: "Python 知识搜索" });
+    fireEvent.change(search, { target: { value: "怎么安全读取字典" } });
+    expect(within(finder).getByRole("link", { name: /Access dict value/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "defualtdict" } });
+    expect(within(finder).getByRole("link", { name: /Default dict/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "" } });
+    const workspace = screen.getByRole("region", { name: "Python cheatsheet" });
+    fireEvent.click(within(workspace).getByRole("button", { name: /Algorithms.*26/ }));
+    expect(document.querySelectorAll(".python-cheat-card")).toHaveLength(20);
+    fireEvent.click(within(workspace).getByRole("button", { name: /再显示 6 张/ }));
+    expect(document.querySelectorAll(".python-cheat-card")).toHaveLength(26);
+  });
+
+  it("opens Python data-structure implementations from global search", async () => {
+    render(<MemoryRouter><App /></MemoryRouter>);
+    const search = screen.getByRole("searchbox", { name: "Global search" });
+    fireEvent.change(search, { target: { value: "implement trie" } });
+    const result = await screen.findByRole("button", { name: /Trie \/ prefix tree.*实现 Trie/ });
+    fireEvent.click(result);
+    expect(await screen.findByRole("heading", { name: "Trie / prefix tree" })).toBeInTheDocument();
+    expect(screen.getByText(/insert\/search O\(L\)/)).toBeInTheDocument();
+    expect(screen.getByText(/class Trie:/)).toBeInTheDocument();
   });
 
   it("renders the read-only activity radar and news feed", async () => {
     render(<MemoryRouter initialEntries={["/discover"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "Events / 活动雷达" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bay Area Events" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Silicon Valley AI Builders/ })).toHaveAttribute("href", "https://luma.com/example");
     expect(screen.getByRole("link", { name: /Bay Area AI on Luma/ })).toHaveAttribute("href", "https://luma.com/discover/sf/ai");
     expect(screen.getByRole("link", { name: /CMU Silicon Valley/ })).toHaveAttribute("href", "https://events.cmu.edu/sv/");
     expect(screen.getByRole("link", { name: /AI ships/ })).toHaveAttribute("href", "https://example.com/news");
-    expect(screen.getByText(/只读发现/)).toBeInTheDocument();
+    expect(screen.getByText(/READ ONLY · NO AUTO-REGISTRATION/)).toBeInTheDocument();
   });
 
   it("renders embedded JavaScript and TypeScript learning tracks with local progress", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("LearningLab");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("LearningHub");
     expect(screen.getByTitle("JavaScript Foundations course player")).toHaveAttribute("src", expect.stringContaining("jS4aFq5-91M"));
     expect(screen.getByRole("link", { name: /JavaScript V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/javascript-v9/");
     expect(screen.getByRole("link", { name: /Front End Development Libraries V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/front-end-development-libraries-v9/");
@@ -161,6 +437,25 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /MARK TODAY DONE/ }));
     expect(screen.getByRole("button", { name: "✓ DONE TODAY / 已完成" })).toBeInTheDocument();
     expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("typescript");
+  });
+
+  it("previews, applies, persists, and undoes natural-language module customization", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "CUSTOMIZE WITH AI" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Tell the agent what to change" }), {
+      target: { value: "隐藏课程与参考" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "PREVIEW CHANGES" }));
+    expect(screen.getByText("隐藏 Courses & References")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "APPLY 1 CHANGE" }));
+    expect(screen.queryByRole("heading", { name: "Courses & References" })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("daily-dashboard:module:learning:layout:v1")).toContain("resource-library");
+
+    fireEvent.click(screen.getByRole("button", { name: "UNDO" }));
+    expect(screen.getByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
   });
 
   it("migrates the previous React learning record into the JavaScript track", async () => {
@@ -186,7 +481,7 @@ describe("App", () => {
 
   it("offers explicit Project Based Learning and Build Your Own X challenge channels", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "Project challenge lane / 特殊项目通道" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Project Challenges (Optional)" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /ENTER GUIDED CHANNEL/ })).toHaveAttribute("href", "https://github.com/practical-tutorials/project-based-learning#python");
     expect(screen.getByRole("link", { name: /ENTER FROM-SCRATCH CHANNEL/ })).toHaveAttribute("href", "https://github.com/codecrafters-io/build-your-own-x");
   });
@@ -195,6 +490,9 @@ describe("App", () => {
     render(<MemoryRouter initialEntries={["/applications"]}><App /></MemoryRouter>);
     expect(await screen.findByRole("heading", { name: "Today toApply" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Today to apply" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Official company career portals" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Google.*OFFICIAL CAREERS/ })).toHaveAttribute("href", "https://www.google.com/about/careers/applications/jobs/results/");
+    expect(screen.getByText("1 NEW TODAY · 1 MATCHED")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent Software Engineer - New Grad" })).toBeInTheDocument();
     expect(screen.getByText("96% MATCH")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "OPEN RESUME ↗" })).toHaveAttribute("href", "/api/v1/candidate-profile/resume");
@@ -202,6 +500,9 @@ describe("App", () => {
     expect(screen.getAllByText("Follow up with CMU alumnus")).toHaveLength(2);
     expect(screen.getByText("backend-v3.pdf")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Follow-up queue" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Gmail application suggestions" })).toBeInTheDocument();
+    expect(screen.getByText("OpenAI coding assessment")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "CONFIRM & UPDATE CRM" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /MANUAL ENTRY/ }));
     expect(screen.getByRole("region", { name: "New application" })).toBeInTheDocument();
     expect(screen.getByText("Primary contact / 主要联系人")).toBeInTheDocument();
@@ -211,7 +512,7 @@ describe("App", () => {
     render(<MemoryRouter initialEntries={["/neetcode"]}><App /></MemoryRouter>);
     expect(screen.queryByLabelText("Solution is required to mark Solved")).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "完成并写心得" }));
-    expect(screen.getByRole("dialog", { name: "保存刷题记录" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Save Attempt" })).toBeInTheDocument();
     const editor = screen.getByLabelText("Solution is required to mark Solved");
     const solved = screen.getByRole("button", { name: "MARK SOLVED" });
     expect(solved).toBeDisabled();

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
-import { createApplication, deleteApplication, loadApplications, loadCandidateProfile, loadJobLeads, markJobLeadApplied, setJobLeadDecision, updateApplication } from "../api";
-import type { ApplicationStage, CandidateProfile, ContactStatus, ContactType, JobApplication, JobApplicationPayload, JobLead } from "../types";
+import { createApplication, decideApplicationSignal, deleteApplication, loadApplicationSignals, loadApplications, loadCandidateProfile, loadJobLeads, markJobLeadApplied, setJobLeadDecision, updateApplication } from "../api";
+import { careerPortals } from "../resources";
+import type { ApplicationSignal, ApplicationStage, CandidateProfile, ContactStatus, ContactType, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead } from "../types";
 
 const stages: Array<{ value: ApplicationStage; label: string; short: string }> = [
   { value: "saved", label: "Saved / 待投", short: "SAVED" },
@@ -31,9 +32,10 @@ const contactStatuses: Array<{ value: ContactStatus; label: string }> = [
   { value: "replied", label: "Replied / 已回复" },
 ];
 
-type ApplicationForm = Omit<JobApplicationPayload, "applied_at" | "follow_up_at"> & {
+type ApplicationForm = Omit<JobApplicationPayload, "applied_at" | "follow_up_at" | "deadline_at"> & {
   applied_at: string;
   follow_up_at: string;
+  deadline_at: string;
 };
 
 const blankForm: ApplicationForm = {
@@ -44,6 +46,7 @@ const blankForm: ApplicationForm = {
   next_step: "",
   applied_at: "",
   follow_up_at: "",
+  deadline_at: "",
   contact_name: "",
   contact_type: "none",
   contact_status: "not_contacted",
@@ -79,7 +82,11 @@ export function ApplicationsPage() {
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [leads, setLeads] = useState<JobLead[]>([]);
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
+  const [signals, setSignals] = useState<ApplicationSignal[]>([]);
+  const [gmailConnection, setGmailConnection] = useState<GmailSignalConnection | null>(null);
+  const [signalBusy, setSignalBusy] = useState<number | null>(null);
   const [feedRefreshedAt, setFeedRefreshedAt] = useState("");
+  const [newLeadCount, setNewLeadCount] = useState(0);
   const [showAllLeads, setShowAllLeads] = useState(false);
   const [leadBusy, setLeadBusy] = useState("");
   const [query, setQuery] = useState("");
@@ -91,12 +98,15 @@ export function ApplicationsPage() {
   const [error, setError] = useState("");
   const today = todayKey();
 
-  const refresh = () => Promise.all([loadApplications(), loadJobLeads(), loadCandidateProfile()])
-    .then(([applicationItems, jobFeed, candidate]) => {
+  const refresh = () => Promise.all([loadApplications(), loadJobLeads(), loadCandidateProfile(), loadApplicationSignals()])
+    .then(([applicationItems, jobFeed, candidate, inbox]) => {
       setApplications(applicationItems);
       setLeads(jobFeed.items);
       setFeedRefreshedAt(jobFeed.refreshed_at);
+      setNewLeadCount(jobFeed.new_count ?? jobFeed.items.filter((item) => item.is_new_today).length);
       setProfile(candidate);
+      setSignals(inbox.items);
+      setGmailConnection(inbox.connection);
     })
     .catch((reason: unknown) => {
       setError(reason instanceof Error ? reason.message : "Unable to load the application workspace");
@@ -182,6 +192,7 @@ export function ApplicationsPage() {
       next_step: application.next_step,
       applied_at: application.applied_at ?? "",
       follow_up_at: application.follow_up_at ?? "",
+      deadline_at: application.deadline_at ?? "",
       contact_name: application.contact_name,
       contact_type: application.contact_type,
       contact_status: application.contact_status,
@@ -209,6 +220,7 @@ export function ApplicationsPage() {
       role: form.role.trim(),
       applied_at: form.applied_at || null,
       follow_up_at: form.follow_up_at || null,
+      deadline_at: form.deadline_at || null,
     };
     try {
       const saved = editingId === null
@@ -246,13 +258,31 @@ export function ApplicationsPage() {
     }
   };
 
+  const decideSignal = async (signal: ApplicationSignal, decision: "accepted" | "dismissed") => {
+    setSignalBusy(signal.id);
+    setError("");
+    try {
+      const result = await decideApplicationSignal(signal.id, decision);
+      setSignals((current) => current.filter((item) => item.id !== signal.id));
+      if (result.application) {
+        setApplications((current) => current.some((item) => item.id === result.application!.id)
+          ? current.map((item) => item.id === result.application!.id ? result.application! : item)
+          : [result.application!, ...current]);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to apply the inbox suggestion");
+    } finally {
+      setSignalBusy(null);
+    }
+  };
+
   return (
     <main className="applications-page">
       <section className="applications-hero panel">
         <div>
-          <p className="eyebrow">AUTO-MATCHED DAILY QUEUE / 自动匹配投递</p>
+          <p className="eyebrow">BAY AREA FIRST · DAILY</p>
           <h1>Today to<br /><span>Apply</span></h1>
-          <p>系统每天从公开岗位源筛选适合你的新岗位。你只做两个动作：打开投递；投完点一下“已投”，其余归档和跟进日期自动完成。</p>
+          <p>Open the role, apply, then mark it applied. Follow-up is scheduled automatically.</p>
           <div className="application-hero-actions">
             <a className="application-add" href="#today-apply">START TODAY / 开始投递</a>
             <button type="button" onClick={openNew}>+ MANUAL ENTRY</button>
@@ -279,14 +309,27 @@ export function ApplicationsPage() {
         <a href="https://career-ops.org/docs" target="_blank" rel="noopener noreferrer"><strong>CAREER OPS</strong><span>LOCAL TOOLS</span></a>
       </section>
 
+      <section className="career-portal-panel panel" aria-label="Official company career portals">
+        <div className="application-section-head">
+          <div><h2>Career Portals</h2></div>
+          <b>{careerPortals.length} OFFICIAL SITES</b>
+        </div>
+        <p className="career-portal-note">FAANG 优先，所有链接直达公司官方招聘搜索页。岗位提醒来自上方每日聚合源，不会把第三方结果伪装成官方全量数据。</p>
+        <div className="career-portal-grid">{careerPortals.map((portal) => (
+          <a className={portal.group === "FAANG" ? "faang" : ""} href={portal.url} target="_blank" rel="noopener noreferrer" key={portal.name}>
+            <span>{portal.mark}</span><div><b>{portal.name}</b><small>{portal.group} · OFFICIAL CAREERS ↗</small></div>
+          </a>
+        ))}</div>
+      </section>
+
       <section className="job-lead-queue panel" id="today-apply" aria-label="Today to apply">
         <div className="application-section-head">
-          <div><p className="eyebrow">TODAY'S SHORTLIST</p><h2>Apply queue / 今日投递</h2></div>
-          <b>{dailyLeads.length} TODAY · {pendingLeads.length} MATCHED</b>
+          <div><p className="eyebrow">BAY AREA FIRST</p><h2>Today’s Matches</h2></div>
+          <b>{newLeadCount} NEW TODAY · {pendingLeads.length} MATCHED</b>
         </div>
         {visibleLeads.length ? <div className="job-lead-grid">{visibleLeads.map((lead, index) => (
           <article key={lead.key}>
-            <header><span>{String(index + 1).padStart(2, "0")}</span><div><b>{lead.match_score}% MATCH</b><small>{lead.track === "internship" ? "INTERNSHIP" : "NEW GRAD"}</small></div></header>
+            <header><span>{String(index + 1).padStart(2, "0")}</span><div>{lead.is_new_today && <small className="new-today">NEW TODAY</small>}<b>{lead.match_score}% MATCH</b><small className={`location-${lead.location_tier}`}>{lead.location_tier === "bay_area" ? "BAY AREA" : lead.location_tier === "remote" ? "REMOTE US" : lead.location_tier === "other_us" ? "OTHER US" : "LOCATION ?"}</small><small>{lead.track === "internship" ? "INTERNSHIP" : "NEW GRAD"}</small></div></header>
             <div className="job-lead-title"><p>{lead.company}</p><h3>{lead.role}</h3><span>{lead.location || "Location not listed"}</span></div>
             <div className="job-match-reasons">{lead.match_reasons.map((reason) => <span key={reason}>{reason}</span>)}</div>
             <footer>
@@ -299,14 +342,36 @@ export function ApplicationsPage() {
       </section>
 
       {bigTechLeads.length > 0 && <section className="big-tech-watch panel" aria-label="Big tech openings">
-        <div className="application-section-head"><div><p className="eyebrow">VERIFIED OPENINGS</p><h2>Big Tech watch / 大厂新岗位</h2></div><b>NO GUESSED DATES</b></div>
+        <div className="application-section-head"><div><h2>Big Tech Openings</h2></div><b>VERIFIED DATES ONLY</b></div>
         <div>{bigTechLeads.map((lead) => <a href={lead.url} target="_blank" rel="noopener noreferrer" key={lead.key}><span>{lead.company}</span><b>{lead.role}</b><small>{lead.posted_at ? `POSTED ${displayDate(lead.posted_at)}` : "FIRST SEEN IN FEED"} · {lead.location}</small></a>)}</div>
       </section>}
+
+      <section className="inbox-copilot panel" aria-label="Gmail application suggestions">
+        <div className="application-section-head">
+          <div><p className="eyebrow">READ-ONLY GMAIL</p><h2>Email Suggestions</h2></div>
+          <b>{signals.length} NEED REVIEW</b>
+        </div>
+        <div className="inbox-connection">
+          <span className={gmailConnection?.automatic ? "online" : "bridge"}>{gmailConnection?.automatic ? "AUTO SYNC" : "CODEX BRIDGE"}</span>
+          <p>{gmailConnection?.last_import_at ? `Last imported ${new Date(gmailConnection.last_import_at).toLocaleString()}` : "Waiting for the first read-only Gmail import."} 邮件不会被修改；只有你点确认后才更新本地 CRM。</p>
+        </div>
+        {signals.length ? <div className="inbox-signal-list">{signals.map((signal) => (
+          <article key={signal.id}>
+            <header><span>{signal.signal_type.replace("_", " ")}</span><b>{signal.confidence}% CONFIDENCE</b></header>
+            <h3>{signal.company || "Company needs review"} · {signal.role_hint}</h3>
+            <p>{signal.subject}</p>
+            <div><span>PROPOSED</span><strong>{stageLabel(signal.suggested_stage)} · {signal.suggested_next_step}</strong>{signal.suggested_deadline_at && <em>DEADLINE {displayDate(signal.suggested_deadline_at)}</em>}</div>
+            <footer>{signal.source_url ? <a href={signal.source_url} target="_blank" rel="noopener noreferrer">OPEN EMAIL ↗</a> : <span />}
+              <div><button className="accept" type="button" disabled={signalBusy === signal.id || !signal.company} title={!signal.company ? "Company could not be identified; dismiss this suggestion or add the application manually." : undefined} onClick={() => decideSignal(signal, "accepted")}>{signalBusy === signal.id ? "SAVING…" : signal.company ? "CONFIRM & UPDATE CRM" : "COMPANY REQUIRED"}</button><button type="button" disabled={signalBusy === signal.id} onClick={() => decideSignal(signal, "dismissed")}>DISMISS</button></div>
+            </footer>
+          </article>
+        ))}</div> : <div className="inbox-empty"><b>NO PENDING EMAIL CHANGES</b><p>没有自动改动。新的申请确认、OA、面试、Offer 或拒信会先出现在这里等你确认。</p></div>}
+      </section>
 
       {editorOpen && (
         <section className="application-editor panel" aria-label={editingId === null ? "New application" : "Edit application"}>
           <div className="application-section-head">
-            <div><p className="eyebrow">{editingId === null ? "NEW PIPELINE ENTRY" : `EDIT ENTRY #${editingId}`}</p><h2>{editingId === null ? "Log an application" : "Update application"}</h2></div>
+            <div><h2>{editingId === null ? "Log Application" : "Edit Application"}</h2></div>
             <button type="button" onClick={closeEditor}>CLOSE ×</button>
           </div>
           <form onSubmit={save}>
@@ -317,6 +382,7 @@ export function ApplicationsPage() {
             <label><span>Applied / 投递日期</span><input type="date" value={form.applied_at} onChange={(event) => setForm({ ...form, applied_at: event.target.value })} /></label>
             <label className="wide"><span>Next step / 下一步</span><input value={form.next_step} onChange={(event) => setForm({ ...form, next_step: event.target.value })} placeholder="e.g. Send alumni note, prepare recruiter screen" /></label>
             <label><span>Follow up / 跟进日期</span><input type="date" value={form.follow_up_at} onChange={(event) => setForm({ ...form, follow_up_at: event.target.value })} /></label>
+            <label><span>Deadline / 截止日期</span><input type="date" value={form.deadline_at} onChange={(event) => setForm({ ...form, deadline_at: event.target.value })} /></label>
             <label><span>Resume version / 简历版本</span><input value={form.resume_version} onChange={(event) => setForm({ ...form, resume_version: event.target.value })} placeholder="backend-v3.pdf" /></label>
             <label><span>Primary contact / 主要联系人</span><input value={form.contact_name} onChange={(event) => setForm({ ...form, contact_name: event.target.value })} placeholder="Name" /></label>
             <label><span>Contact type / 联系人类型</span><select value={form.contact_type} onChange={(event) => setForm({ ...form, contact_type: event.target.value as ContactType })}>{contactTypes.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></label>
@@ -329,14 +395,14 @@ export function ApplicationsPage() {
 
       {due.length > 0 && (
         <section className="follow-up-queue panel" aria-label="Follow-up queue">
-          <div className="application-section-head"><div><p className="eyebrow">ACTION QUEUE</p><h2>Follow up now / 现在该跟进</h2></div><b>{due.length} DUE</b></div>
+          <div className="application-section-head"><div><h2>Follow Up Today</h2></div><b>{due.length} DUE</b></div>
           <div>{due.map((application) => <button type="button" onClick={() => openEdit(application)} key={application.id}><span>{application.follow_up_at! < today ? "OVERDUE" : "TODAY"}</span><b>{application.company} · {application.role}</b><small>{application.next_step || "Add the next concrete step"}</small></button>)}</div>
         </section>
       )}
 
       <section className="application-pipeline panel">
         <div className="application-section-head">
-          <div><p className="eyebrow">PIPELINE</p><h2>Applications / 所有申请</h2></div>
+          <div><h2>Applications</h2></div>
           <label className="application-search"><span>⌕</span><input aria-label="Search applications" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search company, role, contact…" /></label>
         </div>
         <div className="application-stage-filters" aria-label="Filter applications by stage">
@@ -356,6 +422,7 @@ export function ApplicationsPage() {
                 <div className="application-card-grid">
                   <div className="application-next"><b>NEXT STEP</b><p>{application.next_step || "Add one concrete next step."}</p></div>
                   <div className={needsFollowUp ? "attention" : ""}><b>FOLLOW UP</b><p>{displayDate(application.follow_up_at)}{needsFollowUp ? application.follow_up_at! < today ? " · OVERDUE" : " · TODAY" : ""}</p></div>
+                  <div className={application.deadline_at && application.deadline_at <= today ? "attention" : ""}><b>DEADLINE</b><p>{displayDate(application.deadline_at)}</p></div>
                   <div><b>NETWORK</b><p>{contactLabel(application.contact_type, application.contact_status)}{application.contact_name ? ` · ${application.contact_name}` : ""}</p></div>
                   <div><b>RESUME</b><p>{application.resume_version || "Not recorded"}</p></div>
                 </div>

@@ -1,4 +1,9 @@
-import type { AttemptStatus, CandidateProfile, DashboardSnapshot, JobApplication, JobApplicationPayload, JobLead, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState } from "./types";
+import type { ApplicationSignal, AttemptStatus, CandidateProfile, DashboardSnapshot, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead, LifeTask, LifeTaskPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState, TripPlan, TripPlanPayload } from "./types";
+
+async function apiError(response: Response, fallback: string): Promise<Error> {
+  const payload = await response.json().catch(() => null) as { detail?: string } | null;
+  return new Error(payload?.detail || `${fallback}: ${response.status}`);
+}
 
 export async function loadDashboard(): Promise<DashboardSnapshot> {
   const response = await fetch("/api/v1/dashboard", { cache: "no-store" });
@@ -68,6 +73,63 @@ export async function saveTodo(
   return result.item;
 }
 
+export async function loadLifeTasks(): Promise<LifeTask[]> {
+  const response = await fetch("/api/v1/life-tasks", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Life timeline API failed: ${response.status}`);
+  const payload = await response.json() as { items: LifeTask[] };
+  return payload.items;
+}
+
+export async function createLifeTask(payload: LifeTaskPayload): Promise<LifeTask> {
+  const response = await fetch("/api/v1/life-tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Life task save failed: ${response.status}`);
+  const result = await response.json() as { task: LifeTask };
+  return result.task;
+}
+
+export async function updateLifeTask(taskId: number, payload: Partial<LifeTaskPayload>): Promise<LifeTask> {
+  const response = await fetch(`/api/v1/life-tasks/${taskId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Life task update failed: ${response.status}`);
+  const result = await response.json() as { task: LifeTask };
+  return result.task;
+}
+
+export async function deleteLifeTask(taskId: number): Promise<void> {
+  const response = await fetch(`/api/v1/life-tasks/${taskId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Life task delete failed: ${response.status}`);
+}
+
+export async function loadTripPlan(): Promise<TripPlan | null> {
+  const response = await fetch("/api/v1/trip-plan", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Trip planner API failed: ${response.status}`);
+  const payload = await response.json() as { plan: TripPlan | null };
+  return payload.plan;
+}
+
+export async function saveTripPlan(payload: TripPlanPayload): Promise<TripPlan> {
+  const response = await fetch("/api/v1/trip-plan", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Trip plan save failed: ${response.status}`);
+  const result = await response.json() as { plan: TripPlan };
+  return result.plan;
+}
+
+export async function deleteTripPlan(): Promise<void> {
+  const response = await fetch("/api/v1/trip-plan", { method: "DELETE" });
+  if (!response.ok) throw new Error(`Trip plan delete failed: ${response.status}`);
+}
+
 export async function loadApplications(): Promise<JobApplication[]> {
   const response = await fetch("/api/v1/applications", { cache: "no-store" });
   if (!response.ok) throw new Error(`Application CRM API failed: ${response.status}`);
@@ -75,10 +137,10 @@ export async function loadApplications(): Promise<JobApplication[]> {
   return payload.items;
 }
 
-export async function loadJobLeads(): Promise<{ items: JobLead[]; refreshed_at: string }> {
+export async function loadJobLeads(): Promise<{ items: JobLead[]; refreshed_at: string; new_count: number }> {
   const response = await fetch("/api/v1/job-leads", { cache: "no-store" });
   if (!response.ok) throw new Error(`Daily job queue API failed: ${response.status}`);
-  return response.json() as Promise<{ items: JobLead[]; refreshed_at: string }>;
+  return response.json() as Promise<{ items: JobLead[]; refreshed_at: string; new_count: number }>;
 }
 
 export async function loadCandidateProfile(): Promise<CandidateProfile> {
@@ -132,4 +194,26 @@ export async function updateApplication(
 export async function deleteApplication(applicationId: number): Promise<void> {
   const response = await fetch(`/api/v1/applications/${applicationId}`, { method: "DELETE" });
   if (!response.ok) throw new Error(`Application delete failed: ${response.status}`);
+}
+
+export async function loadApplicationSignals(): Promise<{ items: ApplicationSignal[]; connection: GmailSignalConnection }> {
+  const response = await fetch("/api/v1/application-signals", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Inbox Copilot API failed: ${response.status}`);
+  return response.json() as Promise<{ items: ApplicationSignal[]; connection: GmailSignalConnection }>;
+}
+
+export async function decideApplicationSignal(
+  signalId: number,
+  decision: "accepted" | "dismissed",
+): Promise<{ signal: ApplicationSignal; application: JobApplication | null }> {
+  const response = await fetch(`/api/v1/application-signals/${signalId}/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(error?.detail || `Inbox decision failed: ${response.status}`);
+  }
+  return response.json() as Promise<{ signal: ApplicationSignal; application: JobApplication | null }>;
 }

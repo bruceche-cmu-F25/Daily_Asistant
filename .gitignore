@@ -22,6 +22,8 @@ today.html
 data/dashboard_snapshot.json
 data/candidate_profile.json
 data/job_feed_refresh.json
+data/google-oauth-client.json
+data/gmail-token.json
 event-plists/
 *.log
 *.err

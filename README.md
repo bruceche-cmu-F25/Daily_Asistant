@@ -1,10 +1,23 @@
-# Daily Dashboard
+# Daily Assistant
 
-每天从 Google Calendar、Notion 和 Brave Search 汇总信息，生成本地页面 `today.html`。页面顶部的教练模式只负责算法刷题：每次推荐一道具体题，并提供完成标准和卡住时的帮助路径。
+这是一套只在 Bruce 这台 Mac 上运行的 React + FastAPI 个人操作系统。唯一主页是：
 
-## React + FastAPI v2 preview
+```text
+http://127.0.0.1:8766/
+```
 
-`codex/react-fastapi-refactor` 分支正在并行开发新版，本地端口为 `8766`；旧版 `8765` 和旧 SQLite 数据库不会被修改。新版交互只写入独立的 `data/daily_v2.db`。
+页面包括：
+
+- `/`：Calendar、Notion、本周计划、快捷入口和待办。
+- `/life`：只在本机保存的生活事项、时间线、Someday 和完成历史；不与 Calendar/Notion 同步。
+- `/learn`：freeCodeCamp JavaScript V9、前端库、TypeScript、项目级 Python 训练。
+- `/neetcode`：NeetCode 150 Roadmap、Do Now、solution/心得和多次 attempts 历史。
+- `/applications`：自动岗位队列、申请 CRM、follow-up/deadline 和只读 Gmail Inbox Copilot。
+- `/life`：本地生活时间线，以及带按日行程和内置 Google Maps 视图的当前旅行计划。
+- `/discover`：只读湾区活动和新闻雷达。
+- `/python`：181 项 Python 参考卡片、中文知识目录，以及无需 API 的本地智能搜索；支持自然语言、近似拼写、单卡聚焦、最近查看和按分类分页。
+
+## 启动
 
 ```bash
 uv sync
@@ -12,53 +25,31 @@ cd frontend && npm install && npm run build && cd ..
 ./bin/run_v2_dev.sh
 ```
 
-然后打开：
+`run_v2_dev.sh` 会先把 `data/daily_v2.db` 无损升级到最新 schema，再启动 8766。
 
-```text
-http://127.0.0.1:8766/
-```
+## 每天 09:00
 
-新版当前包含 `/`、`/learn`、`/neetcode`、`/applications`、`/discover` 五条路由，以及 Python 工作草稿、Draft/Stuck/Solved Attempt、本地 Todo 状态和求职申请 API。`/applications` 每天从 Simplify New Grad、SpeedyApply 2027 SWE/AI 的公开数据中抓取、去重并按本地简历画像排序，只把最高分的 8 个放进今日投递队列；点 `I APPLIED` 会自动写入 `data/daily_v2.db`，记录公司、岗位、链接、简历版本和投递日期，并创建 7 天后的 follow-up。完整 CRM、联系人、阶段和备注仍保留在页面下方。`data/candidate_profile.json`、简历原文件、岗位快照和 SQLite 均只保存在这台 Mac，不提交到 Git。`/learn` 以 freeCodeCamp JavaScript V9 和 Front End Development Libraries V9 为课程主线，保留官方 JavaScript 视频及 Advanced TypeScript 播放列表，并加入可勾选的 Python Project Gym、FastAPI/pytest/架构/CI 资源，以及 Project Based Learning 和 Build Your Own X 特殊挑战通道；只在这台 Mac 的浏览器保存完成次数和项目 checklist。`/discover` 是只读湾区活动雷达：每天从 Brave 搜索 Luma、CMU Silicon Valley 和大厂在 Bay Area 的活动候选，并提供稳定的官方活动入口；不会自动报名或向外部平台回写。后端测试使用 `.venv/bin/pytest`，前端检查使用 `npm run typecheck`、`npm test` 和 `npm run build`。
-
-无损创建 v2 数据库并导入旧版刷题记录：
+`~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 调用：
 
 ```bash
-.venv/bin/python bin/migrate_v2.py
+./bin/run_daily.sh
 ```
 
-迁移会先把旧库备份到 `data/backups/`，再写入新的 `data/daily_v2.db`；重复执行不会重复导入 Attempt。
+它运行 `bin/refresh_dashboard.py`，原子更新 `data/dashboard_snapshot.json`；如果 Gmail 已授权，还会做一次只读招聘邮件扫描，最后打开 8766。Gmail 扫描失败不会阻止主页刷新。它不再生成 `today.html`，也不会启动旧 8765 服务。
 
-## 运行
+岗位刷新会保留每个匹配岗位的首次发现时间。当天首次发现且尚未提醒的岗位会由 `bin/notify_new_jobs.py` 发送一次 macOS 通知；同一天重复刷新不会重复提醒。Apply 页面同时提供 FAANG 和主要科技公司的官方 careers 直达入口，提醒数据仍明确来自公开聚合岗位源，不声称覆盖各公司官网全部职位。
+
+单独刷新、不重建 Calendar 事件提醒：
 
 ```bash
-todo
-# 或者：
-"$HOME/daily-dashboard/bin/run_daily.sh"
+./bin/refresh_dashboard.py --no-reminders
 ```
 
-只生成页面、不自动打开，也不重建日历提醒：
+## Daily Snapshot
 
-```bash
-"$HOME/daily-dashboard/bin/generate_dashboard.py" --no-open --no-reminders
-```
+Snapshot Module 对 Calendar、Notion、Brave Search、Job Feeds 分别保留 last-known-good 数据。某个源失败时，页面继续显示上一次成功结果，并在 `stale_sources` 中标记；验证失败的 payload 不会覆盖当前文件。`refresh_job_feeds.py` 也通过同一个 Module 写入。
 
-`./bin/generate_dashboard.py` 只有在当前目录已经是 `~/daily-dashboard` 时才有效。
-
-运行测试：
-
-```bash
-PYTHONPYCACHEPREFIX=/tmp/daily-dashboard-pycache \
-  python3 -m unittest discover -s tests -v
-```
-
-## 数据源
-
-- Google Calendar：通过 `gcalcli` 读取当天日程。
-- Notion：通过 `NOTION_API_TOKEN` 读取主页面和链接页面。
-- Brave Search：通过 `BRAVE_API_KEY` 直接调用 Web Search API，不依赖 pi agent skill。
-- Job Feeds：通过公开的 Simplify New Grad JSON 和 SpeedyApply 2027 SWE/AI Markdown 列表生成本地今日投递队列。
-
-默认配置可以用环境变量覆盖：
+环境变量：
 
 ```bash
 export DASHBOARD_HOME="$HOME/daily-dashboard"
@@ -67,53 +58,47 @@ export NOTION_PAGE_ID="35ea5189545c80cfa8c3c910e0265817"
 export NOTION_LINKS_PAGE_ID="c56dc8e916e74f7aa2b2c04482452dd2"
 ```
 
-## Checklist 状态
+数据源：Google Calendar (`gcalcli`)、Notion (`NOTION_API_TOKEN`)、Brave Search (`BRAVE_API_KEY`) 和公开 Job Feeds。
 
-默认运行 `todo` 时，页面会通过仅监听 `127.0.0.1` 的本地服务打开：
+## Gmail Inbox Copilot
 
-```text
-http://127.0.0.1:8765/today.html
+Gmail 侧只读。邮件会先变成 `Application Signal`，显示建议阶段、下一步和识别到的 deadline；只有点 `CONFIRM & UPDATE CRM` 后才写本地 `daily_v2.db`。`DISMISS` 不创建、不修改申请。系统不会发送、归档、删信或改 Gmail 标签，也不会把完整邮件正文存进数据库。
+
+本机使用 Google Desktop OAuth 和 Gmail REST API。首次配置：
+
+```bash
+# 将 Desktop App 凭据保存为 data/google-oauth-client.json，然后运行：
+./bin/connect_gmail.py
 ```
 
-只有具体算法题的进度保存在本机 SQLite：
+授权后 token 保存在 `data/gmail-token.json`，两个文件都被 Git 忽略且权限为 `600`。每天 09:00 的 `run_daily.sh` 会调用 `bin/sync_gmail.py`，页面显示 `AUTO SYNC`。分类完全在本机进行，不产生模型/API 费用；数据库只保存审核建议所需的邮件元数据，不保存完整正文。
 
-```text
-data/dashboard.db
+要断开连接，可在 Google Account 的第三方访问设置中撤销授权，并删除本机 `data/gmail-token.json`。未配置本地 OAuth 时，Codex Gmail bridge 仍可作为手动后备入口。
+
+## 数据与迁移
+
+本地私有数据不会提交 Git：
+
+- `data/daily_v2.db`：唯一可写数据库。
+- `data/dashboard_snapshot.json`：可重建的只读 Snapshot。
+- `data/google-oauth-client.json` 和 `data/gmail-token.json`：本机 Gmail OAuth 凭据，永不提交 Git。
+- `data/candidate_profile.json` 和简历原文件：本地候选人信息。
+- `data/backups/legacy-dashboard-retired-20260717.db`：退休旧版时保留的只读迁移备份。
+
+重复安全地导入旧刷题历史：
+
+```bash
+.venv/bin/python bin/migrate_v2.py
 ```
 
-Calendar 和 Notion checklist 仍只保存在浏览器 `localStorage`：
+迁移前会备份到 `data/backups/`。旧版 `today.html`、8765 server 和专用样式已退休并从项目移除；备份数据库只用于历史数据恢复，不会被正常运行写入。
 
-```text
-todo:<calendar-event-id>
-todo:notion:<notion-block-id>
+## 验证
+
+```bash
+.venv/bin/pytest backend/tests -q
+python3 -m unittest discover -s tests -v
+cd frontend && npm test -- --run && npm run build
 ```
 
-勾选不会回写 Notion，也不会写入 SQLite。SQLite 只记录题目名称、链接、Topic、完成时间、卡住次数、你的 solution 与心得。数据库和浏览器状态都不会提交到 Git。
-
-## 教练模式
-
-- 题库维护在 `data/problem_bank.json`，当前是完整的 NeetCode 150（18 个 Topic）。
-- 需要更新官方题单时运行 `./bin/sync_neetcode150.py`；脚本只有在解析到恰好 150 题时才会覆盖本地题库。
-- 选择当前可用的 `15 / 30 / 45 / 60` 分钟。
-- 页面只突出一个具体 NeetCode 150 题目，并直接打开 NeetCode 题目页。
-- `不会做 / 卡住了` 会展开分层帮助，并增加这道题的卡住次数。
-- `完成并写心得` 会让你保存 solution 和心得，写入 SQLite 后自动切换到下一题。
-- `换一题` 保留当前题目，轮换到另一个未完成题目。
-- 顶部 `History` 会跳到本地刷题历史：显示总进度、各 Topic 进度和每题笔记。
-
-## 视觉主题
-
-Retro shader 主题分别维护在：
-
-- `assets/dashboard-retro.css`：布局、CRT、响应式与高对比面板。
-- `assets/dashboard-retro.js`：安全的交互、实时状态时钟、教练与刷题历史渲染。
-
-外链会根据域名自动获得 favicon、字母 fallback 和品牌强调色；新增链接通常不需要手工添加图标。
-
-生成时这两个文件会被内联进 `today.html`。系统开启“减少动态效果”时，会关闭剩余的轻量动画。
-
-## 自动运行
-
-`~/Library/LaunchAgents/com.bruce.daily-dashboard.plist` 每天 09:00 调用 `bin/run_daily.sh`。脚本刷新数据后会打开新版主页 `http://127.0.0.1:8766/`；生成器会先写临时文件，再原子替换 `today.html`，避免中断时留下不完整页面。
-
-页面顶部会显示 Calendar、Notion、Brave Search、Job Feeds 四个数据源的生成状态。`pi-web.log` 和 `pi-web.err` 是旧版本遗留文件，当前流程不再启动 pi-web。
+架构词汇和边界见 `CONTEXT.md`，关键决策见 `docs/adr/`。

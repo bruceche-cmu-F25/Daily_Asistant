@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Compatibility source adapters used by the canonical 8766 refresh.
+
+The executable v1 HTML/8765 runtime has been retired.  Keep importing this
+module from ``refresh_dashboard.py`` until the source adapters are separated,
+but do not render or serve ``today.html`` again.
+"""
 import argparse
 import csv
 import datetime as dt
@@ -43,6 +49,7 @@ SOURCE_STATUS = {}
 HARVARD_WEB = 'https://www.youtube.com/playlist?list=PLhQjrBD2T380xvFSUmToMMzERZ3qB5Ueu'
 ABDUL_BARI = 'https://www.youtube.com/playlist?list=PLDN4rrl48XKpZkf03iYFl-O29szjTrs_O'
 JOBRIGHT = 'https://jobright.ai/jobs/recommend'
+PRINTING = 'https://mobile.eprintitsaas.com/app/add-files?locationid=657b709e3f26b41cad5395f5&domainname=sfpl'
 SIMPLIFY = 'https://simplify.jobs/jobs'
 NEETCODE = 'https://neetcode.io/roadmap'
 GMAIL = 'https://mail.google.com/mail/u/0/#inbox'
@@ -825,6 +832,7 @@ def render(events, news, jobs, links, weekly, notion, discovered_events=None, jo
         ('This Week', f'{WEEKLY_PLAN_TITLE} - 具体计划', WEEKLY_PLAN_URL, 'green'),
         ('DSA Video', 'Abdul Bari 算法老师', ABDUL_BARI, 'purple'),
         ('Harvard Web', 'CS50W Web Development', HARVARD_WEB, 'purple'),
+        ('printing', 'SFPL mobile printing', PRINTING, 'blue'),
     ]
     quick_actions_html = ''
     for title, sub, url, kind in quick_actions:
@@ -981,46 +989,15 @@ window.dashboardProblemStore = (()=>{{
 
 
 def main(open_page=True, schedule_reminders=True):
-    global WEEKLY_PLAN_TITLE, WEEKLY_PLAN_URL, WEEKLY_PLAN_ID
-    SOURCE_STATUS.clear()
-    WEEKLY_PLAN_TITLE, WEEKLY_PLAN_URL, WEEKLY_PLAN_ID = current_week_page()
-    events = agenda_events()
-    links = links_to_visit()
-    weekly = weekly_plan_digest()
-    notion = high_level_notion_digest()
-    jobs = job_posts()
-    news = tech_news()
-    discovered_events = discover_events()
-    candidate_profile = load_candidate_profile(CANDIDATE_PROFILE_PATH)
-    job_leads, job_feed_errors = collect_job_leads(candidate_profile, today=TODAY)
-    if job_leads:
-        detail = f'{len(job_leads)} matched roles'
-        if job_feed_errors:
-            detail += f'; {len(job_feed_errors)} source warnings'
-        set_status('Job Feeds', True, detail)
-    else:
-        set_status('Job Feeds', False, '; '.join(job_feed_errors) or 'No matching roles')
-    render(
-        events,
-        news,
-        jobs,
-        links,
-        weekly,
-        notion,
-        discovered_events,
-        job_leads,
-        candidate_profile,
+    del open_page, schedule_reminders
+    raise SystemExit(
+        'The legacy today.html/8765 runtime has been retired. '
+        'Use bin/refresh_dashboard.py and http://127.0.0.1:8766/.'
     )
-    if schedule_reminders:
-        schedule_events(events)
-    if open_page:
-        subprocess.run(['open', ensure_dashboard_server()], check=False)
-    print(OUT)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate the daily dashboard.')
-    parser.add_argument('--no-open', action='store_true', help='Generate without opening the page.')
-    parser.add_argument('--no-reminders', action='store_true', help='Skip launchd event reminders.')
-    args = parser.parse_args()
-    main(open_page=not args.no_open, schedule_reminders=not args.no_reminders)
+    raise SystemExit(
+        'The legacy today.html/8765 runtime has been retired. '
+        'Use bin/refresh_dashboard.py and http://127.0.0.1:8766/.'
+    )

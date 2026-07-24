@@ -35,6 +35,7 @@ def test_application_crm_create_update_list_and_delete(tmp_path):
             "next_step": "Ask an alumnus for context",
             "applied_at": "2026-07-17",
             "follow_up_at": "2026-07-22",
+            "deadline_at": "2026-07-29",
             "contact_name": "Alex",
             "contact_type": "alumni",
             "contact_status": "planned",
@@ -44,6 +45,7 @@ def test_application_crm_create_update_list_and_delete(tmp_path):
         assert created.status_code == 201
         application_id = created.json()["application"]["id"]
         assert created.json()["application"]["resume_version"] == "backend-v3.pdf"
+        assert created.json()["application"]["deadline_at"] == "2026-07-29"
 
         updated = request("PATCH", f"/api/v1/applications/{application_id}", {
             "stage": "recruiter_screen",

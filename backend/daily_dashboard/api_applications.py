@@ -44,6 +44,7 @@ class ApplicationFields(BaseModel):
     next_step: str = Field(default="", max_length=4_000)
     applied_at: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     follow_up_at: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    deadline_at: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     contact_name: str = Field(default="", max_length=200)
     contact_type: ContactType = "none"
     contact_status: ContactStatus = "not_contacted"
@@ -78,6 +79,7 @@ class ApplicationUpdate(BaseModel):
     next_step: str | None = Field(default=None, max_length=4_000)
     applied_at: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     follow_up_at: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    deadline_at: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     contact_name: str | None = Field(default=None, max_length=200)
     contact_type: ContactType | None = None
     contact_status: ContactStatus | None = None
@@ -110,6 +112,7 @@ def application_dict(application: JobApplication) -> dict:
         "next_step": application.next_step,
         "applied_at": application.applied_at,
         "follow_up_at": application.follow_up_at,
+        "deadline_at": application.deadline_at,
         "contact_name": application.contact_name,
         "contact_type": application.contact_type,
         "contact_status": application.contact_status,

@@ -20,6 +20,8 @@ LEAD = {
     "category": "AI/ML",
     "posted_at": "2026-07-17",
     "age_days": 0,
+    "first_seen_at": "2026-07-17T09:00:00-07:00",
+    "is_new_today": True,
     "is_big_tech": False,
     "match_score": 96,
     "match_reasons": ["2027 / early-career timing", "AI / agentic systems", "Bay Area / local"],
@@ -52,6 +54,7 @@ def test_daily_job_queue_skip_and_one_click_application(tmp_path, monkeypatch):
         listed = request("GET", "/api/v1/job-leads")
         assert listed.status_code == 200
         assert listed.json()["items"][0]["decision"] == "pending"
+        assert listed.json()["new_count"] == 1
 
         skipped = request("PATCH", "/api/v1/job-leads/lead-netic-1", {"decision": "skipped"})
         assert skipped.status_code == 200

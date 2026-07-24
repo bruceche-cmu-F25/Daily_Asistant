@@ -106,12 +106,15 @@ export type JobLead = {
   company: string;
   role: string;
   location: string;
+  location_tier: "bay_area" | "remote" | "other_us" | "unknown";
   url: string;
   source: string;
   track: "new_grad" | "internship" | string;
   category: string;
   posted_at: string | null;
   age_days: number | null;
+  first_seen_at: string;
+  is_new_today: boolean;
   is_big_tech: boolean;
   match_score: number;
   match_reasons: string[];
@@ -133,6 +136,53 @@ export type TodoState = {
   title: string;
   completed: boolean;
   updated_at: string;
+};
+
+export type LifeCategory = "personal" | "home" | "health" | "finance" | "errands" | "social" | "admin" | "other";
+
+export type LifeTask = {
+  id: number;
+  title: string;
+  category: LifeCategory;
+  due_at: string | null;
+  notes: string;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LifeTaskPayload = {
+  title: string;
+  category: LifeCategory;
+  due_at: string | null;
+  notes: string;
+  completed?: boolean;
+};
+
+export type TripStop = {
+  id: string;
+  title: string;
+  location: string;
+  visit_at: string | null;
+  notes: string;
+  position: number;
+};
+
+export type TripPlan = {
+  id: number;
+  title: string;
+  destination: string;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string;
+  stops: TripStop[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type TripPlanPayload = Omit<TripPlan, "id" | "created_at" | "updated_at" | "stops"> & {
+  stops: Array<Omit<TripStop, "id" | "position"> & { id: string | null; position?: number }>;
 };
 
 export type ApplicationStage =
@@ -157,6 +207,7 @@ export type JobApplication = {
   next_step: string;
   applied_at: string | null;
   follow_up_at: string | null;
+  deadline_at: string | null;
   contact_name: string;
   contact_type: ContactType;
   contact_status: ContactStatus;
@@ -167,3 +218,32 @@ export type JobApplication = {
 };
 
 export type JobApplicationPayload = Omit<JobApplication, "id" | "created_at" | "updated_at">;
+
+export type ApplicationSignal = {
+  id: number;
+  source_message_id: string;
+  sender: string;
+  subject: string;
+  received_at: string;
+  source_url: string;
+  signal_type: "confirmation" | "oa" | "recruiter" | "interview" | "offer" | "rejection" | "status_update";
+  company: string;
+  role_hint: string;
+  summary: string;
+  suggested_stage: ApplicationStage;
+  suggested_next_step: string;
+  suggested_deadline_at: string | null;
+  application_id: number | null;
+  confidence: number;
+  status: "pending" | "accepted" | "dismissed";
+  created_at: string;
+  updated_at: string;
+};
+
+export type GmailSignalConnection = {
+  adapter: string;
+  automatic: boolean;
+  last_import_at: string | null;
+  status: string;
+  detail: string;
+};

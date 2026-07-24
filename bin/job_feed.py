@@ -100,6 +100,42 @@ NON_US_MARKERS = (
     "netherlands",
 )
 
+BAY_AREA_MARKERS = (
+    "bay area",
+    "silicon valley",
+    "san francisco",
+    "south san francisco",
+    "san jose",
+    "santa clara",
+    "sunnyvale",
+    "mountain view",
+    "palo alto",
+    "menlo park",
+    "redwood city",
+    "san mateo",
+    "foster city",
+    "burlingame",
+    "cupertino",
+    "los gatos",
+    "campbell",
+    "milpitas",
+    "fremont",
+    "oakland",
+    "berkeley",
+    "emeryville",
+    "pleasanton",
+    "dublin, ca",
+    "san ramon",
+    "walnut creek",
+)
+
+LOCATION_PRIORITY = {
+    "unknown": 0,
+    "other_us": 1,
+    "remote": 2,
+    "bay_area": 3,
+}
+
 
 def load_candidate_profile(path: Path) -> dict[str, Any]:
     try:
@@ -145,6 +181,18 @@ def _job_key(url: str) -> str:
 def _big_tech(company: str) -> bool:
     normalized = re.sub(r"[^a-z0-9]+", " ", company.lower()).strip()
     return any(name == normalized or name in normalized.split() for name in BIG_TECH)
+
+
+def location_tier(value: str) -> str:
+    """Classify location for Bruce's Bay Area-first daily queue."""
+    location = re.sub(r"\s+", " ", value.lower()).strip()
+    if not location:
+        return "unknown"
+    if any(marker in location for marker in BAY_AREA_MARKERS):
+        return "bay_area"
+    if "remote" in location:
+        return "remote"
+    return "other_us"
 
 
 def parse_speedy_markdown(
@@ -247,13 +295,13 @@ def score_job(job: dict[str, Any], profile: dict[str, Any]) -> tuple[int, list[s
             score += int(group.get("weight", 0))
             reasons.append(str(group.get("label") or "Resume skill match"))
 
-    preferred = [str(place).lower() for place in profile.get("preferred_locations", [])]
-    if any(place in location for place in preferred if place != "remote"):
-        score += 14
+    tier = location_tier(location)
+    if tier == "bay_area":
+        score += 20
         reasons.append("Bay Area / local")
-    elif "remote" in location:
-        score += 9
-        reasons.append("Remote-friendly")
+    elif tier == "remote":
+        score += 8
+        reasons.append("Remote US / flexible")
 
     age_days = job.get("age_days")
     if isinstance(age_days, int):
@@ -288,18 +336,56 @@ def rank_and_dedupe(
         score, reasons = result
         if score < 55:
             continue
-        enriched = {**job, "match_score": score, "match_reasons": reasons}
+        enriched = {
+            **job,
+            "location_tier": location_tier(str(job.get("location") or "")),
+            "match_score": score,
+            "match_reasons": reasons,
+        }
         existing = deduped.get(job["key"])
         if existing is None or score > int(existing.get("match_score", 0)):
             deduped[job["key"]] = enriched
     return sorted(
         deduped.values(),
         key=lambda item: (
+            -LOCATION_PRIORITY.get(str(item.get("location_tier") or "unknown"), 0),
             -int(item.get("match_score", 0)),
             item.get("age_days") if isinstance(item.get("age_days"), int) else 9_999,
             str(item.get("company") or ""),
         ),
     )[:limit]
+
+
+def mark_first_seen(
+    leads: list[dict[str, Any]],
+    previous_leads: list[dict[str, Any]],
+    *,
+    refreshed_at: str,
+    previous_refreshed_at: str = "",
+) -> list[dict[str, Any]]:
+    """Carry first-seen timestamps forward and flag roles first found today."""
+    previous_by_key = {
+        str(item.get("key")): item
+        for item in previous_leads
+        if isinstance(item, dict) and item.get("key")
+    }
+    today = refreshed_at[:10]
+    annotated: list[dict[str, Any]] = []
+    for lead in leads:
+        previous = previous_by_key.get(str(lead.get("key")))
+        if previous:
+            had_first_seen = bool(previous.get("first_seen_at"))
+            first_seen_at = str(previous.get("first_seen_at") or previous_refreshed_at or refreshed_at)
+            is_new_today = first_seen_at[:10] == today if had_first_seen else False
+        else:
+            first_seen_at = refreshed_at
+            is_new_today = True
+        annotated.append({
+            **lead,
+            "first_seen_at": first_seen_at,
+            "is_new_today": is_new_today,
+        })
+    return annotated
 
 
 def _request(url: str, timeout: int) -> urllib.request.Request:
