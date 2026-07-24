@@ -9,23 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_applications import application_dict, now_iso
-from .api_attempts import get_session
+from .api_applications import application_dict
+from .application_intake import IntakeError, advance_from_signal
+from .infra import get_session, now_iso
 from .application_signal_service import import_email_signals
 from .application_signals import EmailEnvelope
 from .gmail_adapter import gmail_configured
-from .models import ApplicationSignal, JobApplication, SyncState
+from .models import ApplicationSignal, SyncState
 
 
 router = APIRouter(prefix="/api/v1/application-signals", tags=["application-signals"])
-STAGE_RANK = {
-    "saved": 0,
-    "applied": 1,
-    "oa": 2,
-    "recruiter_screen": 3,
-    "interview": 4,
-    "offer": 5,
-}
 
 
 class EmailImport(BaseModel):
@@ -122,41 +115,10 @@ def decide_signal(
     timestamp = now_iso()
     application = None
     if payload.decision == "accepted":
-        application = session.get(JobApplication, signal.application_id) if signal.application_id else None
-        if application is None:
-            if not signal.company:
-                raise HTTPException(status_code=409, detail="Company could not be inferred; dismiss and add manually")
-            application = JobApplication(
-                company=signal.company,
-                role=signal.role_hint or "Role from Gmail",
-                job_url="",
-                stage=signal.suggested_stage,
-                next_step=signal.suggested_next_step,
-                applied_at=signal.received_at[:10] if signal.suggested_stage == "applied" else None,
-                follow_up_at=None,
-                deadline_at=signal.suggested_deadline_at,
-                contact_name="",
-                contact_type="none",
-                contact_status="not_contacted",
-                resume_version="",
-                notes=f"Imported from Gmail: {signal.subject}",
-                created_at=timestamp,
-                updated_at=timestamp,
-            )
-            session.add(application)
-            session.flush()
-            signal.application_id = application.id
-        else:
-            should_advance = (
-                signal.suggested_stage in {"rejected", "withdrawn"}
-                or STAGE_RANK.get(signal.suggested_stage, -1) >= STAGE_RANK.get(application.stage, -1)
-            )
-            if should_advance:
-                application.stage = signal.suggested_stage
-                application.next_step = signal.suggested_next_step
-            if signal.suggested_deadline_at:
-                application.deadline_at = signal.suggested_deadline_at
-            application.updated_at = timestamp
+        try:
+            application = advance_from_signal(session, signal, now=timestamp)
+        except IntakeError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
     signal.status = payload.decision
     signal.updated_at = timestamp
     session.commit()

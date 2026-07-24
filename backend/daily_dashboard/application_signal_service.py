@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_applications import now_iso
+from .infra import now_iso
 from .application_signals import EmailEnvelope, classify_email
 from .models import ApplicationSignal, JobApplication, SyncState
 

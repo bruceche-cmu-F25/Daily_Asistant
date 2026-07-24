@@ -2,36 +2,17 @@
 
 from __future__ import annotations
 
-import datetime as dt
-from typing import Literal
-
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_attempts import get_session
+from .application_lifecycle import ApplicationStage, ContactStatus, ContactType
+from .infra import get_session, now_iso
 from .models import JobApplication
 
 
 router = APIRouter(prefix="/api/v1/applications", tags=["applications"])
-
-ApplicationStage = Literal[
-    "saved",
-    "applied",
-    "oa",
-    "recruiter_screen",
-    "interview",
-    "offer",
-    "rejected",
-    "withdrawn",
-]
-ContactType = Literal["none", "alumni", "recruiter", "hiring_manager", "employee", "other"]
-ContactStatus = Literal["not_contacted", "planned", "contacted", "replied"]
-
-
-def now_iso() -> str:
-    return dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 class ApplicationFields(BaseModel):

@@ -13,10 +13,11 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_applications import application_dict, now_iso
-from .api_attempts import get_session
+from .api_applications import application_dict
+from .application_intake import capture_from_lead
+from .infra import get_session, now_iso
 from .legacy import PROJECT_ROOT
-from .models import JobApplication, JobLeadDecision
+from .models import JobLeadDecision
 from .snapshot import load_dashboard_snapshot
 
 
@@ -118,29 +119,13 @@ def mark_job_lead_applied(
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     lead = find_lead(lead_key)
-    url = str(lead.get("url") or "")
-    application = session.scalar(select(JobApplication).where(JobApplication.job_url == url)) if url else None
-    if application is None:
-        today = dt.datetime.now().astimezone().date()
-        reasons = ", ".join(str(reason) for reason in lead.get("match_reasons", []))
-        application = JobApplication(
-            company=str(lead.get("company") or "Unknown company"),
-            role=str(lead.get("role") or "Unknown role"),
-            job_url=url,
-            stage="applied",
-            next_step="Follow up if there is no response",
-            applied_at=today.isoformat(),
-            follow_up_at=(today + dt.timedelta(days=7)).isoformat(),
-            contact_name="",
-            contact_type="none",
-            contact_status="not_contacted",
-            resume_version=str(load_candidate_profile().get("resume_version") or "Default resume"),
-            notes=f"Auto-imported from {lead.get('source', 'job feed')}. Match: {reasons}".strip(),
-            created_at=now_iso(),
-            updated_at=now_iso(),
-        )
-        session.add(application)
-        session.flush()
+    application, _ = capture_from_lead(
+        session,
+        lead,
+        resume_version=str(load_candidate_profile().get("resume_version") or "Default resume"),
+        now=now_iso(),
+        today=dt.datetime.now().astimezone().date(),
+    )
 
     decision = session.get(JobLeadDecision, lead_key)
     if decision is None:

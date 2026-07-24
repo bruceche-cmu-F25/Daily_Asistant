@@ -14,15 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import DATABASE_PATH, make_engine, sqlite_url
+from .infra import now_iso
 from .legacy import LEGACY_DB_PATH, PROJECT_ROOT, load_legacy_progress
 from .models import MigrationMarker, ProblemAttempt
 
 
 MARKER_NAME = "legacy_problem_progress_v1"
-
-
-def now_iso() -> str:
-    return dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def upgrade_database(target: Path) -> None:

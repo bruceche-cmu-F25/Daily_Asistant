@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import CheckConstraint, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from .application_lifecycle import CONTACT_STATUSES, CONTACT_TYPES, STAGES, sql_check
 from .database import Base
 
 
@@ -94,18 +95,9 @@ class TripPlan(Base):
 class JobApplication(Base):
     __tablename__ = "job_applications"
     __table_args__ = (
-        CheckConstraint(
-            "stage IN ('saved', 'applied', 'oa', 'recruiter_screen', 'interview', 'offer', 'rejected', 'withdrawn')",
-            name="ck_job_application_stage",
-        ),
-        CheckConstraint(
-            "contact_type IN ('none', 'alumni', 'recruiter', 'hiring_manager', 'employee', 'other')",
-            name="ck_job_application_contact_type",
-        ),
-        CheckConstraint(
-            "contact_status IN ('not_contacted', 'planned', 'contacted', 'replied')",
-            name="ck_job_application_contact_status",
-        ),
+        CheckConstraint(sql_check("stage", STAGES), name="ck_job_application_stage"),
+        CheckConstraint(sql_check("contact_type", CONTACT_TYPES), name="ck_job_application_contact_type"),
+        CheckConstraint(sql_check("contact_status", CONTACT_STATUSES), name="ck_job_application_contact_status"),
         Index("ix_job_application_stage_follow_up", "stage", "follow_up_at"),
     )
 

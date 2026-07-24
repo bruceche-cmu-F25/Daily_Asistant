@@ -9,8 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_applications import now_iso
-from .api_attempts import get_session
+from .infra import get_session, now_iso
 from .models import LifeTask
 
 
