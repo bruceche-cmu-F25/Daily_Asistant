@@ -484,6 +484,11 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Project Challenges (Optional)" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /ENTER GUIDED CHANNEL/ })).toHaveAttribute("href", "https://github.com/practical-tutorials/project-based-learning#python");
     expect(screen.getByRole("link", { name: /ENTER FROM-SCRATCH CHANNEL/ })).toHaveAttribute("href", "https://github.com/codecrafters-io/build-your-own-x");
+    expect(screen.getByRole("link", { name: /OpenWorker/ })).toHaveAttribute("href", "https://github.com/andrewyng/openworker");
+    expect(screen.getByRole("link", { name: /OpenWork.*different-ai/ })).toHaveAttribute("href", "https://github.com/different-ai/openwork");
+    expect(screen.getByRole("link", { name: /PocketFlow Codebase Knowledge/ })).toHaveAttribute("href", "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge");
+    expect(screen.getByRole("link", { name: /RepoWiki/ })).toHaveAttribute("href", "https://github.com/he-yufeng/RepoWiki");
+    expect(screen.getByRole("link", { name: /Aider.*Aider-AI/ })).toHaveAttribute("href", "https://github.com/Aider-AI/aider");
   });
 
   it("renders the local application CRM with follow-up and resume context", async () => {

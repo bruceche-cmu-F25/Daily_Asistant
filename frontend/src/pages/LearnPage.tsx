@@ -89,6 +89,11 @@ const learningResourceGroups = [
     resources: [
       { mark: "FS", title: "Full Stack Open", provider: "University of Helsinki", description: "完整练习 React、REST API、测试、TypeScript 和 CI。", url: "https://fullstackopen.com/en/" },
       { mark: "PBL", title: "Project Based Learning", provider: "GitHub", description: "按语言挑选从零构建应用的教程，Python 和 JavaScript 都有。", url: "https://github.com/practical-tutorials/project-based-learning" },
+      { mark: "OW", title: "OpenWorker", provider: "Andrew Ng · GitHub", description: "研究本地优先、可接多模型与连接器的开源 AI coworker 架构。", url: "https://github.com/andrewyng/openworker" },
+      { mark: "OW", title: "OpenWork", provider: "different-ai · GitHub", description: "学习如何用桌面应用和 MCP 创建、复用并分享 AI 工作流。", url: "https://github.com/different-ai/openwork" },
+      { mark: "PF", title: "PocketFlow Codebase Knowledge", provider: "The Pocket · GitHub", description: "用 AI 分析代码库的核心抽象与关系，并生成适合初学者阅读的图文教程。", url: "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge" },
+      { mark: "RW", title: "RepoWiki", provider: "he-yufeng · GitHub", description: "从本地目录或 GitHub 仓库生成可导出的 Wiki、阅读路线与终端问答。", url: "https://github.com/he-yufeng/RepoWiki" },
+      { mark: "AI", title: "Aider", provider: "Aider-AI · GitHub", description: "在终端中与多种 LLM 结对编程，理解代码库并结合 Git、测试和 lint 完成修改。", url: "https://github.com/Aider-AI/aider" },
     ],
   },
 ] as const;

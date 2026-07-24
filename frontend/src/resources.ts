@@ -76,6 +76,11 @@ export const dashboardResources: DashboardResource[] = [
   { id: "build-your-own-x", title: "Build Your Own X", subtitle: "Recreate technology", url: "https://github.com/codecrafters-io/build-your-own-x", category: "study", mark: "X", accent: "cyan" },
   { id: "ml-beginners", title: "ML for Beginners", subtitle: "Microsoft curriculum", url: "https://github.com/microsoft/ML-For-Beginners", category: "study", mark: "ML", accent: "purple" },
   { id: "advanced-ts", title: "Advanced TypeScript", subtitle: "Video tutorial", url: "https://www.youtube.com/watch?v=lMfGp29Ht8c&list=PLIvujZeVDLMx040-j1W4WFs1BxuTGdI_b", category: "study", mark: "TS", accent: "blue" },
+  { id: "openworker", title: "OpenWorker", subtitle: "Local-first AI coworker", url: "https://github.com/andrewyng/openworker", category: "study", mark: "OW", accent: "green" },
+  { id: "openwork", title: "OpenWork", subtitle: "Shareable AI workflows", url: "https://github.com/different-ai/openwork", category: "study", mark: "OW", accent: "purple" },
+  { id: "pocketflow-codebase-knowledge", title: "PocketFlow Codebase Knowledge", subtitle: "Turn codebases into tutorials", url: "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge", category: "study", mark: "PF", accent: "amber" },
+  { id: "repowiki", title: "RepoWiki", subtitle: "Generate a wiki for any codebase", url: "https://github.com/he-yufeng/RepoWiki", category: "study", mark: "RW", accent: "cyan" },
+  { id: "aider", title: "Aider", subtitle: "AI pair programming in the terminal", url: "https://github.com/Aider-AI/aider", category: "study", mark: "AI", accent: "green" },
 
   { id: "github-profile", title: "GitHub Profile", subtitle: "bruceche-cmu-F25", url: "https://github.com/bruceche-cmu-F25", category: "profile", mark: "GH", accent: "green" },
   { id: "idea-browser", title: "IdeaBrowser", subtitle: "Browse product ideas", url: "https://www.ideabrowser.com/hub/ideas/browse", category: "tools", mark: "IB", accent: "cyan" },
