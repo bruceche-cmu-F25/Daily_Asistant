@@ -10,7 +10,7 @@ http://127.0.0.1:8766/
 
 - `/`：Calendar、Notion、本周计划、快捷入口和待办。
 - `/life`：只在本机保存的生活事项、时间线、Someday 和完成历史；不与 Calendar/Notion 同步。
-- `/learn`：freeCodeCamp JavaScript V9、前端库、TypeScript、项目级 Python 训练。
+- `/learn`：全栈 + Agentic AI 大图、5 条学习路线、Daily/Pi Web Codebase Gym、freeCodeCamp JavaScript V9、TypeScript 和项目级 Python 训练。
 - `/agent`：以独立源 iframe 嵌入本机 Pi Web，提供 Pi Agent 的 sessions、models、skills、tools 和项目文件工作区。
 - `/neetcode`：NeetCode 150 Roadmap、Do Now、solution/心得和多次 attempts 历史。
 - `/applications`：自动岗位队列、申请 CRM、follow-up/deadline 和只读 Gmail Inbox Copilot。

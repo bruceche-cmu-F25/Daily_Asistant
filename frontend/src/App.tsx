@@ -167,7 +167,7 @@ export function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${location.pathname === "/learn" ? " learn-shell" : ""}`}>
       <header className="topbar">
         <NavLink className="brand" to="/" aria-label="Daily OS home">
           <span className="brand-mark">&gt;_</span>
@@ -258,7 +258,7 @@ export function App() {
             <Route path="/" element={<HomePage dashboard={dashboard} />} />
             {moduleRegistry.map((module) => <Route path={module.path} element={moduleElements[module.id]} key={module.id} />)}
           </Routes>
-          {location.pathname !== "/" && <footer>LOCAL-FIRST / CANONICAL RUNTIME / PORT 8766</footer>}
+          {location.pathname !== "/" && location.pathname !== "/learn" && <footer>LOCAL-FIRST / CANONICAL RUNTIME / PORT 8766</footer>}
         </div>
       </div>
     </div>

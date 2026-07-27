@@ -1,0 +1,357 @@
+export type KnowledgeNodeZh = {
+  label: string;
+  does: string;
+  matters: string;
+  proof: string;
+};
+
+export const knowledgeDomainZh: Record<string, { title: string; subtitle: string }> = {
+  web: { title: "Web 基础", subtitle: "所有应用之下的浏览器与网络运行时" },
+  frontend: { title: "前端", subtitle: "把状态变成可访问、可交互的界面" },
+  backend: { title: "后端", subtitle: "在稳定契约后执行和保护业务规则" },
+  data: { title: "数据", subtitle: "持久化、查询并保护系统事实" },
+  systems: { title: "系统工程", subtitle: "让软件在生产环境可靠运行" },
+  distributed: { title: "分布式系统", subtitle: "在局部故障下协调多个节点" },
+  agentic: { title: "Agentic AI", subtitle: "让模型能够观察、决策并执行动作" },
+};
+
+export const knowledgeFlowZh: Record<string, { label: string; description: string }> = {
+  all: { label: "完整系统", description: "把能力、工具选择和扩展性概念放进同一张地图。" },
+  "web-request": { label: "Web 请求", description: "一次用户交互如何穿过界面、HTTP、业务规则和持久化数据。" },
+  "data-write": { label: "数据写入", description: "一个经过验证的变化如何成为持久、可观察的系统状态。" },
+  "agent-action": { label: "Agent 动作", description: "一个 AI-native 目标如何经过模型推理、受控工具并改变真实软件状态。" },
+  scale: { label: "规模与可靠性", description: "当负载和故障超出单进程边界后真正重要的概念。" },
+};
+
+export const knowledgeNodeZh: Record<string, KnowledgeNodeZh> = {
+  internet: {
+    label: "互联网与 DNS",
+    does: "负责定位机器，并在不同网络之间传输数据包。",
+    matters: "任何部署和 API 调用最终都依赖寻址、路由和域名解析。",
+    proof: "追踪一次域名解析到服务器 IP 的过程，并说明 TLS 从哪里开始。",
+  },
+  http: {
+    label: "HTTP 与 TLS",
+    does: "定义请求、响应、缓存、安全和连接语义。",
+    matters: "前后端边界本质上是 HTTP 契约；不理解它会产生状态和安全问题。",
+    proof: "解释方法、状态码、Header、Cookie、CORS、缓存和一次 TLS 握手。",
+  },
+  browser: {
+    label: "浏览器运行时",
+    does: "解析文档、执行 JavaScript、绘制像素并实施 Web 安全模型。",
+    matters: "React 仍运行在浏览器里；渲染、事件、存储和性能都从这里开始。",
+    proof: "追踪 HTML 解析、DOM/CSSOM、布局、绘制到事件处理的完整过程。",
+  },
+  html: {
+    label: "HTML 语义",
+    does: "描述文档含义和交互结构。",
+    matters: "语义化 HTML 在没有 JavaScript 时就提供可访问性、表单和浏览器行为。",
+    proof: "只使用原生元素构建一个键盘可完整操作的表单。",
+  },
+  css: {
+    label: "CSS 布局",
+    does: "控制布局、视觉层级、响应式行为和交互状态。",
+    matters: "组件只有在不同内容、视口和输入方式下都正确才算完成。",
+    proof: "使用 Grid/Flex、内在尺寸和 Focus 状态实现一个响应式布局。",
+  },
+  javascript: {
+    label: "JavaScript",
+    does: "在浏览器和 Node 运行时中表达程序行为。",
+    matters: "函数、闭包、对象、Promise 和事件循环位于所有 JS 框架之下。",
+    proof: "完成一个原生浏览器应用，并解释闭包、异步执行和可变状态边界。",
+  },
+  typescript: {
+    label: "TypeScript",
+    does: "为 JavaScript 增加静态契约和重构反馈。",
+    matters: "类型让模块边界变得明确，使大型代码库能够安全演进。",
+    proof: "用联合类型表达状态机，并消除 API 边界上的不安全类型断言。",
+  },
+  "build-tools": {
+    label: "构建工具",
+    does: "解析模块、转换源码、打包资源并提供开发反馈循环。",
+    matters: "Vite、npm、Lint 和构建产物决定源码如何变成可部署软件。",
+    proof: "解释脚本、模块解析、环境变量和生产 Bundle 的生成过程。",
+  },
+  react: {
+    label: "React",
+    does: "把应用状态映射为组件树。",
+    matters: "React 的价值是组合和状态同步，而不是所有界面都必须使用它。",
+    proof: "分别使用 DOM API 和 React 实现同一交互，并解释取舍。",
+  },
+  components: {
+    label: "组件",
+    does: "通过明确输入和行为建立可复用的 UI 边界。",
+    matters: "好的组件降低耦合；坏的组件只是把复杂度转移到 Props。",
+    proof: "按职责拆分页面，并解释每一份状态为什么由该组件拥有。",
+  },
+  state: {
+    label: "客户端状态",
+    does: "表示暂时性的用户状态和界面状态。",
+    matters: "大多数前端 Bug 来自重复、过期或归属错误的状态。",
+    proof: "把状态正确分类为局部、共享、URL、派生或服务端状态。",
+  },
+  routing: {
+    label: "路由与 URL",
+    does: "把 URL 映射为页面，并让导航可分享、可恢复。",
+    matters: "URL 是持久的应用状态，不只是页面切换工具。",
+    proof: "实现嵌套路由以及 Loading、Error 和 Not Found 行为。",
+  },
+  "server-state": {
+    label: "服务端状态",
+    does: "获取、缓存、失效并同步远程数据。",
+    matters: "远程数据具有延迟和所有权；把它当本地状态会制造过期 UI。",
+    proof: "实现 Loading、Empty、Success、乐观更新和回滚状态。",
+  },
+  accessibility: {
+    label: "可访问性",
+    does: "让软件适用于键盘、读屏器和不同视觉、运动能力。",
+    matters: "可访问性属于正确性的一部分，也会改善所有用户的结构体验。",
+    proof: "只用键盘完成完整工作流，并检查 Accessibility Tree。",
+  },
+  "frontend-testing": {
+    label: "前端测试",
+    does: "验证组件和浏览器流程中用户能够观察到的行为。",
+    matters: "测试让界面可以安全改变，而不会冻结具体实现。",
+    proof: "在单元、集成和浏览器三个边界覆盖一个关键用户流程。",
+  },
+  "node-runtime": {
+    label: "Node.js 运行时",
+    does: "使用事件驱动 I/O 在服务端运行 JavaScript。",
+    matters: "Node 可以统一前后端语言，但 CPU 工作和异步错误必须被明确处理。",
+    proof: "构建 HTTP Handler，并解释事件循环、Stream 和进程生命周期。",
+  },
+  python: {
+    label: "Python",
+    does: "用于后端、自动化、数据和 AI 工作流的通用语言。",
+    matters: "Python 鼓励简单服务代码，但仍需要类型、验证和测试纪律。",
+    proof: "构建一个有类型、验证、测试和错误处理的 Package 与 API。",
+  },
+  "api-contract": {
+    label: "API 契约",
+    does: "定义服务之间的输入、输出、错误、身份和兼容性。",
+    matters: "稳定契约允许前端和后端独立演进。",
+    proof: "为成功路径和所有预期失败编写 OpenAPI 示例。",
+  },
+  "backend-framework": {
+    label: "FastAPI / Express",
+    does: "把传输层请求映射为经过验证的应用调用。",
+    matters: "框架消除协议样板，但不应该成为业务架构本身。",
+    proof: "保持 Route 简单，把业务规则移动到可独立测试的 Service。",
+  },
+  "service-layer": {
+    label: "服务层",
+    does: "独立于 HTTP 和存储来协调业务规则。",
+    matters: "这个边界让 Use Case 可测试，避免 Route 或 ORM Model 拥有一切。",
+    proof: "不启动 Web Server 或真实数据库即可测试一个业务用例。",
+  },
+  auth: {
+    label: "身份与授权",
+    does: "确认身份，并决定允许访问的数据和操作。",
+    matters: "只有登录而没有对象级授权，仍然会泄露或破坏数据。",
+    proof: "实现 Session 验证和允许、拒绝两类 Ownership 测试。",
+  },
+  "background-jobs": {
+    label: "后台任务",
+    does: "把缓慢、可重试或定时工作移出请求延迟。",
+    matters: "可靠异步工作需要幂等、重试策略和可见性，而不只是 Queue。",
+    proof: "设计一个安全重试、具有 Dead Letter 和进度状态的任务。",
+  },
+  "backend-testing": {
+    label: "后端测试",
+    does: "验证业务规则、集成边界和失败行为。",
+    matters: "快速 Service 测试配合少量真实集成，比大量 Route Mock 更可靠。",
+    proof: "覆盖领域规则、API 验证、持久化和一个端到端请求。",
+  },
+  sql: {
+    label: "SQL",
+    does: "以声明式方式查询和转换关系数据。",
+    matters: "ORM 不会消除 Join、执行计划、事务或数据基数问题。",
+    proof: "编写多表查询，并使用 EXPLAIN 改进低效计划。",
+  },
+  postgres: {
+    label: "PostgreSQL",
+    does: "使用约束、索引和事务保存关系型事实。",
+    matters: "一个强大的默认数据库通常比过早引入多种存储更有效。",
+    proof: "根据真实访问模式设计约束和索引，并测试事务行为。",
+  },
+  "data-modeling": {
+    label: "数据建模",
+    does: "把领域事实和关系转化为持久结构。",
+    matters: "坏的数据模型会把复杂度推向每个查询，并允许非法状态存在。",
+    proof: "明确实体、不变量、所有权、生命周期和预期查询模式。",
+  },
+  migrations: {
+    label: "数据库迁移",
+    does: "随着时间安全改变已存储的 Schema 和数据。",
+    matters: "生产数据不能在应用类型变化时被简单重置。",
+    proof: "设计支持零停机和回滚的 Expand / Migrate / Contract 变化。",
+  },
+  redis: {
+    label: "缓存 / Redis",
+    does: "让高频或短暂数据靠近计算节点。",
+    matters: "缓存用一致性复杂度换取延迟；失效策略才是真正的设计工作。",
+    proof: "定义 Cache Key、TTL、失效、击穿保护和故障降级。",
+  },
+  search: {
+    label: "搜索与向量",
+    does: "通过文本相关性、相似度或专用索引检索数据。",
+    matters: "搜索是一种独立访问模式；只有语义相似有价值时才需要向量。",
+    proof: "针对同一产品查询比较 SQL 搜索、搜索引擎和向量检索。",
+  },
+  "object-storage": {
+    label: "对象存储",
+    does: "保存文件、图片和模型产物等大型不可变 Blob。",
+    matters: "数据库适合保存 Metadata 和所有权，不一定适合保存所有字节。",
+    proof: "设计带类型、大小和授权验证的签名上传下载流程。",
+  },
+  processes: {
+    label: "操作系统与进程",
+    does: "提供进程、内存、文件、信号、线程和资源隔离。",
+    matters: "生产软件是一个会启动、消耗资源、失败和关闭的进程。",
+    proof: "检查运行服务的端口、文件、内存、信号和关闭行为。",
+  },
+  networking: {
+    label: "网络",
+    does: "通过 Socket、TCP、路由和域名解析移动数据。",
+    matters: "延迟、超时、连接限制和丢包最终都会表现为应用行为。",
+    proof: "区分一次连接中的 DNS、TCP、TLS、HTTP、Proxy 和应用耗时。",
+  },
+  "load-balancing": {
+    label: "负载均衡",
+    does: "把流量分发到健康的服务实例。",
+    matters: "水平扩展需要健康检查、无状态、路由和优雅摘除。",
+    proof: "解释健康检查、Sticky Session、Connection Draining 和故障行为。",
+  },
+  containers: {
+    label: "容器",
+    does: "把进程与可重复的文件系统和运行边界打包。",
+    matters: "容器改善可重复性，但不能代替架构和运维。",
+    proof: "构建非 Root、带健康检查和确定性依赖的最小镜像。",
+  },
+  cicd: {
+    label: "CI / CD",
+    does: "自动执行验证和可重复交付。",
+    matters: "如果发布依赖未记录的人工步骤，变化就不是真正可交付的。",
+    proof: "建立测试、构建、部署、健康验证和回滚 Pipeline。",
+  },
+  observability: {
+    label: "可观察性",
+    does: "使用日志、指标、Trace 和 Profile 解释运行时行为。",
+    matters: "无法观察的系统无法调试；信号必须把用户影响连接到原因。",
+    proof: "跨日志和 Span 追踪一个失败请求，并定义 SLI 与告警。",
+  },
+  security: {
+    label: "安全",
+    does: "管理信任、数据暴露、供应链和滥用路径。",
+    matters: "安全是每个边界的属性，不是最后补上的功能。",
+    proof: "为输入、身份、Secret、依赖、存储和网络边界建立 Threat Model。",
+  },
+  replication: {
+    label: "复制",
+    does: "维护多份副本以提高可用性和读取能力。",
+    matters: "副本会引入延迟、Failover、冲突和一致性选择。",
+    proof: "解释 Leader/Follower 写入、Failover、Quorum Read 和过期副本。",
+  },
+  partitioning: {
+    label: "分区",
+    does: "把数据或工作拆分到多台机器。",
+    matters: "Partition Key 决定热点、查询成本、再平衡和故障范围。",
+    proof: "选择分区键并预测倾斜、跨分区查询和迁移成本。",
+  },
+  consistency: {
+    label: "一致性",
+    does: "定义客户端在并发操作中可能观察到哪些值。",
+    matters: "最终一致和强一致必须成为明确的用户可见保证。",
+    proof: "把操作历史分类为线性、因果、Read-your-writes 或最终一致。",
+  },
+  consensus: {
+    label: "共识",
+    does: "让节点在故障情况下对一个有序历史达成一致。",
+    matters: "Leader Election 和 Replicated Log 是可靠协调系统的基础。",
+    proof: "解释 Raft Term、Quorum、Log Safety，以及两个 Leader 为何不能同时提交。",
+  },
+  transactions: {
+    label: "事务",
+    does: "在明确的原子性和隔离保证下组合多个变化。",
+    matters: "本地事务和分布式 Workflow 需要不同的正确性与恢复策略。",
+    proof: "比较数据库事务、Outbox、Two-phase Commit 和 Saga。",
+  },
+  queues: {
+    label: "队列与流",
+    does: "在生产者和消费者之间缓冲工作并记录有序事件。",
+    matters: "交付保证来自 Ack、幂等、排序和 Replay，而不是产品名称。",
+    proof: "设计一个能够处理重复和 Backpressure 的 At-least-once Consumer。",
+  },
+  "fault-tolerance": {
+    label: "容错",
+    does: "在超时、过载和组件故障时保持有用行为。",
+    matters: "重试可能放大故障；恢复必须被设计并实际测试。",
+    proof: "执行覆盖超时、重试预算、Circuit Breaker 和降级模式的故障演练。",
+  },
+  "model-api": {
+    label: "模型 API",
+    does: "把上下文转化为文本、结构化决策或工具请求。",
+    matters: "模型是概率计算，不是数据库、权限系统或 Workflow Engine。",
+    proof: "用明确输入、受限输出、超时、重试和错误处理调用模型。",
+  },
+  "context-window": {
+    label: "上下文设计",
+    does: "为每次模型调用选择指令、状态、示例和检索证据。",
+    matters: "Agent 质量通常首先是上下文架构问题，而不是模型大小问题。",
+    proof: "解释系统指令、当前状态、工具、检索和历史分别应该放什么。",
+  },
+  "structured-output": {
+    label: "结构化输出",
+    does: "把模型输出约束为可验证的机器契约。",
+    matters: "软件需要可解析决策和明确失败路径，而不是期待模型输出合法 JSON。",
+    proof: "验证 Schema、拒绝非法输出，并处理部分输出和拒绝响应。",
+  },
+  "tool-use": {
+    label: "工具调用",
+    does: "让模型请求软件执行确定性的读取和动作。",
+    matters: "工具把推理连接到真实状态；Schema 和 Result 设计决定可靠性。",
+    proof: "设计带验证、幂等、有用错误和最小权限的窄工具。",
+  },
+  "agent-loop": {
+    label: "Agent 循环",
+    does: "重复观察、决策、执行和检查，直到完成或触发停止条件。",
+    matters: "循环、限制、状态机和恢复逻辑才是真正的 Agent Runtime。",
+    proof: "实现迭代限制、取消、工具结果、失败和最终结果。",
+  },
+  memory: {
+    label: "状态与记忆",
+    does: "在模型上下文之外保存持久的用户、任务和工作状态。",
+    matters: "聊天历史不是可靠记忆；状态需要所有权、生命周期和检索策略。",
+    proof: "区分 Working State、对话历史、持久事实和语义检索。",
+  },
+  mcp: {
+    label: "MCP",
+    does: "标准化 AI 客户端发现并调用工具和资源的方式。",
+    matters: "MCP 减少自定义集成，但仍需要信任、生命周期和权限设计。",
+    proof: "暴露一个只读工具，并解释启动、Schema、Transport 和故障行为。",
+  },
+  permissions: {
+    label: "权限与人工确认",
+    does: "限制 Agent 权限，并把高影响决策交给人类。",
+    matters: "有用的 Agent 需要能力；安全的 Agent 需要明确范围和确认边界。",
+    proof: "把操作分类为读取、可恢复写入、高影响和禁止，并执行对应策略。",
+  },
+  evals: {
+    label: "评测与追踪",
+    does: "衡量 Agent 结果，并记录产生结果的完整路径。",
+    matters: "Prompt 变化也是软件变化；没有 Eval 就会产生不可见回归。",
+    proof: "建立任务集、成功 Rubric、Tool Trace、延迟成本视图和回归 Gate。",
+  },
+  "pi-agent": {
+    label: "Pi Agent",
+    does: "组合模型、Session、Skill、Tool、文件和受限 Coding Agent 循环。",
+    matters: "Pi 是小型、可组合 Agent Runtime 和 Web Workspace 的具体参考。",
+    proof: "追踪一条 Pi 消息从 UI/Session 到模型、工具、文件变化和最终结果。",
+  },
+  "ai-native-ux": {
+    label: "AI-Native 体验",
+    does: "围绕目标、预览、协作和可检查的 Agent 工作来设计软件。",
+    matters: "AI-native 不是加入聊天框；用户需要控制、进度、来源和恢复能力。",
+    proof: "设计一个 Agent 提案、预览、受控执行并解释结果的完整 Workflow。",
+  },
+};

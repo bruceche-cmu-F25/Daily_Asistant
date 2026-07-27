@@ -7,6 +7,33 @@ export type PiWebStatus = {
   detail: string;
 };
 
+export type AiTutorStatus = {
+  configured: boolean;
+  model: string | null;
+  detail: string;
+};
+
+export type AiTutorMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type AiTutorContext = {
+  node: {
+    id: string;
+    label: string;
+    labelZh: string;
+    does: string;
+    doesZh: string;
+    matters: string;
+    mattersZh: string;
+  };
+  domain: { title: string; titleZh: string };
+  adjacent: Array<{ label: string; labelZh: string }>;
+  path: { title: string; titleZh: string } | null;
+  mode: "explain" | "example" | "quiz" | "question";
+};
+
 async function apiError(response: Response, fallback: string): Promise<Error> {
   const payload = await response.json().catch(() => null) as { detail?: string } | null;
   return new Error(payload?.detail || `${fallback}: ${response.status}`);
@@ -28,6 +55,51 @@ export async function loadPiWebStatus(): Promise<PiWebStatus> {
   const response = await fetch("/api/v1/pi-web/status", { cache: "no-store" });
   if (!response.ok) throw new Error(`Pi Web status API failed: ${response.status}`);
   return response.json() as Promise<PiWebStatus>;
+}
+
+export async function loadAiTutorStatus(): Promise<AiTutorStatus> {
+  const response = await fetch("/api/v1/ai-tutor/status", { cache: "no-store" });
+  if (!response.ok) throw await apiError(response, "AI Tutor status API failed");
+  return response.json() as Promise<AiTutorStatus>;
+}
+
+export async function streamAiTutorMessage(
+  messages: AiTutorMessage[],
+  context: AiTutorContext,
+  signal: AbortSignal,
+  onChunk: (text: string) => void,
+): Promise<void> {
+  const response = await fetch("/api/v1/ai-tutor/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, context }),
+    signal,
+  });
+  if (!response.ok) throw await apiError(response, "AI Tutor request failed");
+  if (!response.body) throw new Error("AI Tutor stream is unavailable");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+    for (const event of events) {
+      const data = event
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!data || data === "[DONE]") continue;
+      const payload = JSON.parse(data) as { text?: string; error?: string };
+      if (payload.error) throw new Error(payload.error);
+      if (payload.text) onChunk(payload.text);
+    }
+    if (done) break;
+  }
 }
 
 export async function loadWorkspace(problemKey: string): Promise<ProblemWorkspace> {

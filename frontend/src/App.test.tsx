@@ -28,6 +28,12 @@ vi.mock("./api", () => ({
     latency_ms: 12,
     detail: "Pi Web is ready",
   }),
+  loadAiTutorStatus: () => Promise.resolve({
+    configured: false,
+    model: null,
+    detail: "Set AI_TUTOR_API_KEY and AI_TUTOR_MODEL in the backend environment.",
+  }),
+  streamAiTutorMessage: () => Promise.resolve(),
   loadNeetCode: () => Promise.resolve({
     problems: [
       { key: "leetcode:two-sum", title: "Two Sum", topic: "Arrays & Hashing", difficulty: "Easy", minutes: 25, start_url: "https://neetcode.io/problems/two-integer-sum/question?list=neetcode150" },
@@ -441,90 +447,55 @@ describe("App", () => {
     expect(screen.getByText(/READ ONLY · NO AUTO-REGISTRATION/)).toBeInTheDocument();
   });
 
-  it("renders embedded JavaScript and TypeScript learning tracks with local progress", async () => {
+  it("renders one full-screen bilingual knowledge map instead of the old learning modules", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("LearningHub");
-    expect(screen.getByTitle("JavaScript Foundations course player")).toHaveAttribute("src", expect.stringContaining("jS4aFq5-91M"));
-    expect(screen.getByRole("link", { name: /JavaScript V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/javascript-v9/");
-    expect(screen.getByRole("link", { name: /Front End Development Libraries V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/front-end-development-libraries-v9/");
-    expect(screen.getByRole("link", { name: /FastAPI Tutorial/ })).toHaveAttribute("href", "https://fastapi.tiangolo.com/tutorial/");
-    expect(screen.queryByText(/One useful note/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Advanced TypeScript/ }));
-    expect(screen.getByTitle("Advanced TypeScript course player")).toHaveAttribute("src", expect.stringContaining("PLIvujZeVDLMx040"));
-    fireEvent.click(screen.getByRole("button", { name: /MARK TODAY DONE/ }));
-    expect(screen.getByRole("button", { name: "✓ DONE TODAY / 已完成" })).toBeInTheDocument();
-    expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("typescript");
+
+    expect(await screen.findByRole("region", { name: "Interactive software knowledge map" })).toBeInTheDocument();
+    expect(screen.getByText("软件系统全景图")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Focus FRONTEND" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Focus AGENTIC AI" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Learning path/ })).toBeInTheDocument();
+    expect(screen.queryByText("Learning Roadmaps")).not.toBeInTheDocument();
+    expect(screen.queryByText("Codebase Gym")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "CUSTOMIZE WITH AI" })).not.toBeInTheDocument();
   });
 
-  it("renders five dependency-based learning roadmaps and saves node progress locally", async () => {
+  it("opens a bilingual node drawer and saves simple progress", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
 
-    expect(await screen.findByRole("heading", { name: "Learning Roadmaps" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /JavaScript/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /React/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Full Stack Development/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /System Design/ })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: /Distributed Systems/ }));
-    expect(screen.getByRole("heading", { name: "Distributed Systems Roadmap" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Consensus & Leader Election: locked" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "MARK NODE COMPLETE" }));
-    expect(screen.getByRole("button", { name: "Replication: ready" })).toBeInTheDocument();
-    expect(window.localStorage.getItem("daily-dashboard:learning-roadmaps:v1")).toContain("\"distributed-systems\":[\"01\"]");
+    const reactNode = await screen.findByRole("button", { name: /ReactReact/ });
+    fireEvent.click(reactNode);
+    expect(screen.getByRole("complementary", { name: "React details" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "React" })).toBeInTheDocument();
+    expect(screen.getByText(/把应用状态映射为组件树/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "New · 新概念" }));
+    expect(screen.getByRole("button", { name: "Learning · 学习中" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("daily-dashboard:knowledge-map:progress:v1")).toContain("\"react\":\"learning\"");
   });
 
-  it("previews, applies, persists, and undoes natural-language module customization", async () => {
+  it("uses a path overlay, search, and next-node navigation without locking nodes", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
+    const path = await screen.findByRole("combobox", { name: /Learning path/ });
+    fireEvent.change(path, { target: { value: "agentic-ai" } });
+    expect(screen.getByText("Agentic AI Software", { selector: ".knowledge-path-bar b" })).toBeInTheDocument();
+    expect(screen.getByText("1 / 11")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "NEXT →" }));
+    expect(screen.getByText("2 / 11")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "CUSTOMIZE WITH AI" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Tell the agent what to change" }), {
-      target: { value: "隐藏课程与参考" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "PREVIEW CHANGES" }));
-    expect(screen.getByText("隐藏 Courses & References")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "APPLY 1 CHANGE" }));
-    expect(screen.queryByRole("heading", { name: "Courses & References" })).not.toBeInTheDocument();
-    expect(window.localStorage.getItem("daily-dashboard:module:learning:layout:v1")).toContain("resource-library");
-
-    fireEvent.click(screen.getByRole("button", { name: "UNDO" }));
-    expect(screen.getByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "Search knowledge map" });
+    fireEvent.change(search, { target: { value: "pi web" } });
+    const searchResults = await screen.findByRole("listbox", { name: "Knowledge search results" });
+    fireEvent.click(within(searchResults).getByRole("button", { name: /Pi AgentPi Agent/ }));
+    expect(screen.getByRole("complementary", { name: "Pi Agent details" })).toBeInTheDocument();
   });
 
-  it("migrates the previous React learning record into the JavaScript track", async () => {
-    window.localStorage.setItem("daily-dashboard:learning-progress:v1", JSON.stringify({
-      react: { sessions: ["2026-07-15"] },
-      typescript: { sessions: [] },
-    }));
+  it("keeps external links in one verified resources drawer", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("button", { name: /JavaScript Foundations/ })).toHaveTextContent("1 SESSIONS");
-  });
-
-  it("turns the Python project gym into actionable saved missions", async () => {
-    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "Learning Progress API" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /OPEN PROJECT REPO/ })).toHaveAttribute("href", "https://github.com/bruceche-cmu-F25/Daily_Asistant/tree/codex/react-fastapi-refactor");
-    const task = screen.getByRole("checkbox", { name: "Design the learning session API contract" });
-    fireEvent.click(task);
-    expect(task).toBeChecked();
-    expect(window.localStorage.getItem("daily-dashboard:project-gym:v1")).toContain("api-contract");
-    fireEvent.click(screen.getByRole("button", { name: /Reliable backend/ }));
-    expect(screen.getByRole("heading", { name: "Refactor Learning Backend" })).toBeInTheDocument();
-  });
-
-  it("offers explicit Project Based Learning and Build Your Own X challenge channels", async () => {
-    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
-    expect(await screen.findByRole("heading", { name: "Project Challenges (Optional)" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /ENTER GUIDED CHANNEL/ })).toHaveAttribute("href", "https://github.com/practical-tutorials/project-based-learning#python");
-    expect(screen.getByRole("link", { name: /ENTER FROM-SCRATCH CHANNEL/ })).toHaveAttribute("href", "https://github.com/codecrafters-io/build-your-own-x");
-    expect(screen.getByRole("link", { name: /OpenWorker/ })).toHaveAttribute("href", "https://github.com/andrewyng/openworker");
-    expect(screen.getByRole("link", { name: /OpenWork.*different-ai/ })).toHaveAttribute("href", "https://github.com/different-ai/openwork");
-    expect(screen.getByRole("link", { name: /PocketFlow Codebase Knowledge/ })).toHaveAttribute("href", "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge");
-    expect(screen.getByRole("link", { name: /RepoWiki/ })).toHaveAttribute("href", "https://github.com/he-yufeng/RepoWiki");
-    expect(screen.getByRole("link", { name: /Aider.*Aider-AI/ })).toHaveAttribute("href", "https://github.com/Aider-AI/aider");
-    expect(screen.getByRole("link", { name: /Pi Web.*agegr.*MIT/ })).toHaveAttribute("href", "https://github.com/agegr/pi-web");
+    fireEvent.click(await screen.findByRole("button", { name: /RESOURCES/ }));
+    expect(screen.getByRole("complementary", { name: "Learning resources" })).toBeInTheDocument();
+    expect(screen.getAllByText("VERIFIED 2026-07-26")).toHaveLength(10);
+    expect(screen.getByRole("link", { name: /Learn React/ })).toHaveAttribute("href", "https://react.dev/learn");
+    expect(screen.getByRole("link", { name: /Pi Web Source/ })).toHaveAttribute("href", "https://github.com/agegr/pi-web");
   });
 
   it("renders the local application CRM with follow-up and resume context", async () => {
