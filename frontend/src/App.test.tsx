@@ -22,6 +22,12 @@ vi.mock("./api", () => ({
     quiet_links: [{ title: "LinkedIn", url: "https://www.linkedin.com/in/chi-cheng921/", kind: "profile", label: "Profile" }],
     target_copy: "Target", target_copy_cn: "目标",
   }),
+  loadPiWebStatus: () => Promise.resolve({
+    online: true,
+    url: "http://127.0.0.1:30141",
+    latency_ms: 12,
+    detail: "Pi Web is ready",
+  }),
   loadNeetCode: () => Promise.resolve({
     problems: [
       { key: "leetcode:two-sum", title: "Two Sum", topic: "Arrays & Hashing", difficulty: "Easy", minutes: 25, start_url: "https://neetcode.io/problems/two-integer-sum/question?list=neetcode150" },
@@ -186,6 +192,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "HOME" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "LEARN" })).toHaveAttribute("href", "/learn");
     expect(screen.getByRole("link", { name: "PYTHON" })).toHaveAttribute("href", "/python");
+    expect(screen.getByRole("link", { name: "AGENT" })).toHaveAttribute("href", "/agent");
     expect(screen.getByRole("link", { name: "LIFE" })).toHaveAttribute("href", "/life");
     expect(screen.getByRole("link", { name: "APPLY" })).toHaveAttribute("href", "/applications");
     expect(screen.getByRole("link", { name: "EVENTS" })).toHaveAttribute("href", "/discover");
@@ -197,6 +204,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: /04Events/ })).toHaveAttribute("href", "/discover");
     expect(screen.getByRole("link", { name: /Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#inbox");
     expect(screen.getByRole("link", { name: /printing/ })).toHaveAttribute("href", "https://mobile.eprintitsaas.com/app/add-files?locationid=657b709e3f26b41cad5395f5&domainname=sfpl");
+    expect(screen.getByRole("link", { name: /Pi Web.*Local coding agent/ })).toHaveAttribute("href", "http://127.0.0.1:30141");
     expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/chi-cheng921/");
     expect(container.querySelector('[data-brand-logo="gmail"] svg')).toBeInTheDocument();
     expect(container.querySelector('[data-brand-logo="linkedin"] svg')).toBeInTheDocument();
@@ -207,6 +215,15 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Open module sidebar" })).toHaveAttribute("aria-expanded", "false");
     expect(container.querySelector(".app-body")).toHaveClass("sidebar-closed");
     expect(window.localStorage.getItem("daily-dashboard:module-sidebar:open")).toBe("false");
+  });
+
+  it("embeds Pi Web as a local Agent module", async () => {
+    render(<MemoryRouter initialEntries={["/agent"]}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole("heading", { name: "Pi Agent" })).toBeInTheDocument();
+    expect(await screen.findByText("ONLINE")).toBeInTheDocument();
+    expect(screen.getByTitle("Pi Agent workspace")).toHaveAttribute("src", "http://127.0.0.1:30141");
+    expect(screen.getByRole("link", { name: "OPEN IN NEW WINDOW ↗" })).toHaveAttribute("href", "http://127.0.0.1:30141");
   });
 
   it("keeps personal life tasks on an isolated timeline", async () => {
@@ -439,6 +456,24 @@ describe("App", () => {
     expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("typescript");
   });
 
+  it("renders five dependency-based learning roadmaps and saves node progress locally", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole("heading", { name: "Learning Roadmaps" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /JavaScript/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /React/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Full Stack Development/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /System Design/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Distributed Systems/ }));
+    expect(screen.getByRole("heading", { name: "Distributed Systems Roadmap" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Consensus & Leader Election: locked" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "MARK NODE COMPLETE" }));
+    expect(screen.getByRole("button", { name: "Replication: ready" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("daily-dashboard:learning-roadmaps:v1")).toContain("\"distributed-systems\":[\"01\"]");
+  });
+
   it("previews, applies, persists, and undoes natural-language module customization", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
     expect(await screen.findByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
@@ -489,6 +524,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: /PocketFlow Codebase Knowledge/ })).toHaveAttribute("href", "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge");
     expect(screen.getByRole("link", { name: /RepoWiki/ })).toHaveAttribute("href", "https://github.com/he-yufeng/RepoWiki");
     expect(screen.getByRole("link", { name: /Aider.*Aider-AI/ })).toHaveAttribute("href", "https://github.com/Aider-AI/aider");
+    expect(screen.getByRole("link", { name: /Pi Web.*agegr.*MIT/ })).toHaveAttribute("href", "https://github.com/agegr/pi-web");
   });
 
   it("renders the local application CRM with follow-up and resume context", async () => {

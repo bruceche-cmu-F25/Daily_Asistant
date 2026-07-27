@@ -1,4 +1,4 @@
-export type ModuleId = "life" | "learn" | "python" | "neetcode" | "applications" | "discover";
+export type ModuleId = "life" | "learn" | "python" | "agent" | "neetcode" | "applications" | "discover";
 
 export type ModuleDefinition = {
   id: ModuleId;
@@ -33,6 +33,14 @@ export const moduleRegistry: ModuleDefinition[] = [
     title: "Python Reference",
     description: "Searchable Python knowledge and interview patterns.",
     capabilities: ["knowledge-search", "reference"],
+  },
+  {
+    id: "agent",
+    path: "/agent",
+    navLabel: "AGENT",
+    title: "Pi Agent",
+    description: "Local Pi Web workspace, sessions, tools, skills, and files.",
+    capabilities: ["agent-workspace", "sessions", "tools", "skills"],
   },
   {
     id: "neetcode",

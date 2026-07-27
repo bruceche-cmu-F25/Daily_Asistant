@@ -17,6 +17,7 @@ const quickActionSubtitles: Record<string, string> = {
   "This Week": "Weekly plan",
   "DSA Video": "Algorithms course",
   "Harvard Web": "CS50W Web Development",
+  "Pi Web": "Local coding agent",
 };
 
 const identity = brandIdentity;

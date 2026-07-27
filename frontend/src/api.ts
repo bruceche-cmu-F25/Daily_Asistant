@@ -1,5 +1,12 @@
 import type { ApplicationSignal, AttemptStatus, CandidateProfile, DashboardSnapshot, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead, LifeTask, LifeTaskPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState, TripPlan, TripPlanPayload } from "./types";
 
+export type PiWebStatus = {
+  online: boolean;
+  url: string;
+  latency_ms: number | null;
+  detail: string;
+};
+
 async function apiError(response: Response, fallback: string): Promise<Error> {
   const payload = await response.json().catch(() => null) as { detail?: string } | null;
   return new Error(payload?.detail || `${fallback}: ${response.status}`);
@@ -15,6 +22,12 @@ export async function loadNeetCode(): Promise<NeetCodeSnapshot> {
   const response = await fetch("/api/v1/neetcode", { cache: "no-store" });
   if (!response.ok) throw new Error(`NeetCode API failed: ${response.status}`);
   return response.json() as Promise<NeetCodeSnapshot>;
+}
+
+export async function loadPiWebStatus(): Promise<PiWebStatus> {
+  const response = await fetch("/api/v1/pi-web/status", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Pi Web status API failed: ${response.status}`);
+  return response.json() as Promise<PiWebStatus>;
 }
 
 export async function loadWorkspace(problemKey: string): Promise<ProblemWorkspace> {

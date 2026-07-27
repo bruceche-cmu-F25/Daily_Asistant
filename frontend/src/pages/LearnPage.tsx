@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ModuleCustomizer } from "../components/ModuleCustomizer";
+import { LearningRoadmaps } from "../components/LearningRoadmaps";
 import {
   applyLayoutOperations,
   normalizeLayoutConfig,
@@ -94,6 +95,7 @@ const learningResourceGroups = [
       { mark: "PF", title: "PocketFlow Codebase Knowledge", provider: "The Pocket · GitHub", description: "用 AI 分析代码库的核心抽象与关系，并生成适合初学者阅读的图文教程。", url: "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge" },
       { mark: "RW", title: "RepoWiki", provider: "he-yufeng · GitHub", description: "从本地目录或 GitHub 仓库生成可导出的 Wiki、阅读路线与终端问答。", url: "https://github.com/he-yufeng/RepoWiki" },
       { mark: "AI", title: "Aider", provider: "Aider-AI · GitHub", description: "在终端中与多种 LLM 结对编程，理解代码库并结合 Git、测试和 lint 完成修改。", url: "https://github.com/Aider-AI/aider" },
+      { mark: "PI", title: "Pi Web", provider: "agegr · GitHub · MIT", description: "为 pi coding agent 提供本地 Web UI，可浏览会话、实时聊天、配置模型和技能，并预览项目文件。", url: "https://github.com/agegr/pi-web" },
     ],
   },
 ] as const;
@@ -241,7 +243,13 @@ function readProjectProgress(): ProjectProgress {
 function readLearningLayout(): ModuleLayoutConfig {
   try {
     const raw = learningStorage()?.getItem(LEARNING_LAYOUT_STORAGE_KEY);
-    return normalizeLayoutConfig(raw ? JSON.parse(raw) as Partial<ModuleLayoutConfig> : null, learningComponentRegistry);
+    const saved = raw ? JSON.parse(raw) as Partial<ModuleLayoutConfig> : null;
+    const normalized = normalizeLayoutConfig(saved, learningComponentRegistry);
+    if (!Array.isArray(saved?.order) || saved.order.includes("roadmaps")) return normalized;
+    const order = normalized.order.filter((id) => id !== "roadmaps");
+    const todayIndex = order.indexOf("today");
+    order.splice(todayIndex >= 0 ? todayIndex + 1 : 0, 0, "roadmaps");
+    return { ...normalized, order };
   } catch {
     return defaultLearningLayout;
   }
@@ -365,6 +373,15 @@ export function LearnPage() {
             );
           })}
         </div>
+      </section>}
+
+      {componentIsVisible("roadmaps") && <section className="panel learn-section learning-roadmaps" aria-labelledby="learning-roadmaps-title" data-component-id="roadmaps" style={{ order: componentOrder("roadmaps") }}>
+        <div className="learn-heading">
+          <div><h2 id="learning-roadmaps-title">Learning Roadmaps</h2></div>
+          <span>Dependencies · proof · local progress</span>
+        </div>
+        <p className="learning-roadmaps-intro">Choose a path, open a node, and complete its proof before moving downstream. Progress stays on this Mac.</p>
+        <LearningRoadmaps />
       </section>}
 
       {componentIsVisible("course-workspace") && <section className="panel learn-section learning-workspace" aria-labelledby="learning-workspace-title" data-component-id="course-workspace" style={{ order: componentOrder("course-workspace") }}>

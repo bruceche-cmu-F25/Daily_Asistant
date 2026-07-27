@@ -11,6 +11,7 @@ http://127.0.0.1:8766/
 - `/`：Calendar、Notion、本周计划、快捷入口和待办。
 - `/life`：只在本机保存的生活事项、时间线、Someday 和完成历史；不与 Calendar/Notion 同步。
 - `/learn`：freeCodeCamp JavaScript V9、前端库、TypeScript、项目级 Python 训练。
+- `/agent`：以独立源 iframe 嵌入本机 Pi Web，提供 Pi Agent 的 sessions、models、skills、tools 和项目文件工作区。
 - `/neetcode`：NeetCode 150 Roadmap、Do Now、solution/心得和多次 attempts 历史。
 - `/applications`：自动岗位队列、申请 CRM、follow-up/deadline 和只读 Gmail Inbox Copilot。
 - `/life`：本地生活时间线，以及带按日行程和内置 Google Maps 视图的当前旅行计划。
@@ -25,7 +26,15 @@ cd frontend && npm install && npm run build && cd ..
 ./bin/run_v2_dev.sh
 ```
 
-`run_v2_dev.sh` 会先把 `data/daily_v2.db` 无损升级到最新 schema，再启动 8766。
+`run_v2_dev.sh` 会先在 `127.0.0.1:30141` 启动固定版本的
+`@agegr/pi-web@0.8.1` sidecar（端口已被使用时不会重复启动），再把
+`data/daily_v2.db` 无损升级到最新 schema，并启动 8766。Pi Web 的运行日志写入
+`pi-web.log` 和 `pi-web.err`。
+
+Agent Module 保持两个进程、两个 origin：Daily 只通过
+`/api/v1/pi-web/status` 检查 sidecar 是否可用，不反向代理 Pi Web API，也不直接
+控制 agent。iframe 只开放剪贴板能力；Pi Web 仍负责自己的 session、工具权限和文件访问。
+如需覆盖默认端口，可在启动前设置 `PI_WEB_PORT`，并让后端的 `PI_WEB_URL` 指向相同地址。
 
 ## 每天 09:00
 

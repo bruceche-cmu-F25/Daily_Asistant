@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-d
 
 import { loadDashboard, loadNeetCode } from "./api";
 import { BrandGlyph, brandIdentity } from "./components/BrandLogo";
+import { AgentPage } from "./pages/AgentPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
@@ -159,6 +160,7 @@ export function App() {
     life: <LifePage />,
     learn: <LearnPage />,
     python: <PythonCheatsheetPage />,
+    agent: <AgentPage />,
     neetcode: <NeetCodePage snapshot={snapshot} onRefresh={refreshSnapshot} />,
     applications: <ApplicationsPage />,
     discover: <DiscoverPage dashboard={dashboard} />,

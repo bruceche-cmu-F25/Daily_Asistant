@@ -11,6 +11,7 @@ from .api_application_signals import router as application_signals_router
 from .api_attempts import router as attempts_router
 from .api_job_leads import router as job_leads_router
 from .api_life_tasks import router as life_tasks_router
+from .api_pi_web import router as pi_web_router
 from .api_trip_plan import router as trip_plan_router
 from .api_todos import router as todos_router
 from .legacy import PROJECT_ROOT
@@ -23,6 +24,7 @@ app.include_router(applications_router)
 app.include_router(application_signals_router)
 app.include_router(job_leads_router)
 app.include_router(life_tasks_router)
+app.include_router(pi_web_router)
 app.include_router(trip_plan_router)
 app.include_router(attempts_router)
 app.include_router(todos_router)

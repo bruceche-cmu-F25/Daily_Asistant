@@ -5,7 +5,7 @@ from pathlib import Path
 import anyio
 import httpx
 
-from daily_dashboard import legacy
+from daily_dashboard import api_pi_web, legacy
 from daily_dashboard.main import app
 
 
@@ -24,6 +24,34 @@ def test_health_endpoint():
         "ok": True,
         "version": "2.0.0-dev",
         "mode": "local-first",
+    }
+
+
+def test_pi_web_status_endpoint_reports_probe_result(monkeypatch):
+    monkeypatch.setattr(
+        api_pi_web,
+        "fetch_pi_web_status",
+        lambda: {
+            "online": True,
+            "url": "http://127.0.0.1:30141",
+            "latency_ms": 9,
+            "detail": "Pi Web is ready",
+        },
+    )
+
+    async def request_status():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/v1/pi-web/status")
+
+    response = anyio.run(request_status)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "online": True,
+        "url": "http://127.0.0.1:30141",
+        "latency_ms": 9,
+        "detail": "Pi Web is ready",
     }
 
 
@@ -106,3 +134,12 @@ def test_v2_launch_agent_runs_at_login_and_keeps_server_alive():
     assert service["ProgramArguments"] == [
         "/Users/bruce/daily-dashboard/bin/run_v2_dev.sh"
     ]
+
+
+def test_v2_launcher_starts_a_pinned_local_pi_web_sidecar():
+    launcher = (PROJECT_ROOT / "bin" / "run_v2_dev.sh").read_text(encoding="utf-8")
+
+    assert "@agegr/pi-web@0.8.1" in launcher
+    assert "--no-open" in launcher
+    assert "127.0.0.1" in launcher
+    assert "30141" in launcher

@@ -16,6 +16,12 @@ export const learningComponentRegistry: ModuleComponentDefinition[] = [
     aliases: ["今日学习", "今天学什么", "today learning", "learning tracks"],
   },
   {
+    id: "roadmaps",
+    label: "Learning Roadmaps",
+    description: "Dependency graphs for JavaScript, React, full stack, system design, and distributed systems.",
+    aliases: ["学习路线图", "roadmap", "roadmaps", "学习路径", "技能树"],
+  },
+  {
     id: "course-workspace",
     label: "Course Workspace",
     description: "Embedded lesson, session checklist, and completion action.",

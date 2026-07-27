@@ -51,6 +51,7 @@ export const dashboardResources: DashboardResource[] = [
   { id: "abdul-bari", title: "DSA Video", subtitle: "Abdul Bari algorithms course", url: "https://www.youtube.com/playlist?list=PLDN4rrl48XKpZkf03iYFl-O29szjTrs_O", category: "daily", mark: "▶", accent: "red", priority: true },
   { id: "harvard-web", title: "Harvard Web", subtitle: "CS50W Web Development", url: "https://www.youtube.com/playlist?list=PLhQjrBD2T380xvFSUmToMMzERZ3qB5Ueu", category: "daily", mark: "H", accent: "red", priority: true },
   { id: "printing", title: "printing", subtitle: "SFPL mobile printing", url: "https://mobile.eprintitsaas.com/app/add-files?locationid=657b709e3f26b41cad5395f5&domainname=sfpl", category: "daily", mark: "P", accent: "cyan", priority: true },
+  { id: "pi-web-agent", title: "Pi Web", subtitle: "Local coding agent", url: "http://127.0.0.1:30141", category: "daily", mark: "PI", accent: "cyan", priority: true, searchTerms: "agent coding local web ui" },
 
   { id: "simplify", title: "Simplify Jobs", subtitle: "Job search platform", url: "https://simplify.jobs/jobs", category: "jobs", mark: "S", accent: "cyan" },
   { id: "linkedin", title: "LinkedIn", subtitle: "Profile + job search", url: "https://www.linkedin.com/in/chi-cheng921/", category: "jobs", mark: "in", accent: "blue" },
@@ -81,6 +82,7 @@ export const dashboardResources: DashboardResource[] = [
   { id: "pocketflow-codebase-knowledge", title: "PocketFlow Codebase Knowledge", subtitle: "Turn codebases into tutorials", url: "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge", category: "study", mark: "PF", accent: "amber" },
   { id: "repowiki", title: "RepoWiki", subtitle: "Generate a wiki for any codebase", url: "https://github.com/he-yufeng/RepoWiki", category: "study", mark: "RW", accent: "cyan" },
   { id: "aider", title: "Aider", subtitle: "AI pair programming in the terminal", url: "https://github.com/Aider-AI/aider", category: "study", mark: "AI", accent: "green" },
+  { id: "pi-web-source", title: "Pi Web Source", subtitle: "MIT web UI for the pi coding agent", url: "https://github.com/agegr/pi-web", category: "study", mark: "PI", accent: "cyan", searchTerms: "agent coding local web ui open source MIT" },
 
   { id: "github-profile", title: "GitHub Profile", subtitle: "bruceche-cmu-F25", url: "https://github.com/bruceche-cmu-F25", category: "profile", mark: "GH", accent: "green" },
   { id: "idea-browser", title: "IdeaBrowser", subtitle: "Browse product ideas", url: "https://www.ideabrowser.com/hub/ideas/browse", category: "tools", mark: "IB", accent: "cyan" },
