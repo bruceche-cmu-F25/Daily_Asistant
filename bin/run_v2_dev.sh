@@ -1,6 +1,11 @@
 #!/bin/zsh
 set -euo pipefail
 
+# launchd does not inherit interactive shell variables. Load the same local
+# credentials used by the scheduled refresh without copying secrets into Git.
+source "$HOME/.zprofile" 2>/dev/null || true
+source "$HOME/.zshrc" 2>/dev/null || true
+
 BASE="${DASHBOARD_HOME:-$HOME/daily-dashboard}"
 cd "$BASE"
 

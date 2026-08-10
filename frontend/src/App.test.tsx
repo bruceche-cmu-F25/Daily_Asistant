@@ -34,6 +34,36 @@ vi.mock("./api", () => ({
     detail: "Set AI_TUTOR_API_KEY and AI_TUTOR_MODEL in the backend environment.",
   }),
   streamAiTutorMessage: () => Promise.resolve(),
+  loadDailyAgentStatus: () => Promise.resolve({
+    configured: true,
+    model: "test-model",
+    detail: "Ready · test-model",
+  }),
+  loadDailyAgentHistory: () => Promise.resolve([]),
+  loadDailyAgentSettings: () => Promise.resolve({
+    base_url: "https://api.openai.com/v1",
+    model: "test-model",
+    has_api_key: false,
+    has_saved_api_key: false,
+    source: "default",
+  }),
+  saveDailyAgentSettings: (settings: { base_url: string; model: string; api_key?: string; clear_api_key?: boolean }) => Promise.resolve({
+    base_url: settings.base_url,
+    model: settings.model,
+    has_api_key: !settings.clear_api_key,
+    has_saved_api_key: !settings.clear_api_key,
+    source: "saved",
+  }),
+  testDailyAgentSettings: (settings: { model: string }) => Promise.resolve({ ok: true, model: settings.model }),
+  clearDailyAgentHistory: () => Promise.resolve(),
+  streamDailyAgentMessage: () => Promise.resolve(),
+  approveDailyAgentDraft: (id: number) => Promise.resolve({
+    draft: { id, message_id: 1, kind: "life_task", payload: { title: "Book dentist", category: "health", due_at: null, notes: "" }, summary: "Book dentist", status: "approved", created_at: "", resolved_at: "" },
+    task: { id: 1, title: "Book dentist", category: "health", due_at: null, notes: "", completed: false, completed_at: null, created_at: "", updated_at: "" },
+  }),
+  dismissDailyAgentDraft: (id: number) => Promise.resolve({
+    draft: { id, message_id: 1, kind: "life_task", payload: { title: "Book dentist", category: "health", due_at: null, notes: "" }, summary: "Book dentist", status: "dismissed", created_at: "", resolved_at: "" },
+  }),
   loadNeetCode: () => Promise.resolve({
     problems: [
       { key: "leetcode:two-sum", title: "Two Sum", topic: "Arrays & Hashing", difficulty: "Easy", minutes: 25, start_url: "https://neetcode.io/problems/two-integer-sum/question?list=neetcode150" },
@@ -66,7 +96,7 @@ vi.mock("./api", () => ({
     id: 51,
     title: "Renew driver's license",
     category: "admin",
-    due_at: "2026-08-02T10:30",
+    due_at: "2099-01-12T10:30",
     notes: "Bring proof of address.",
     completed: false,
     completed_at: null,
@@ -74,7 +104,7 @@ vi.mock("./api", () => ({
     updated_at: "2026-07-17T09:00:00-07:00",
   }]),
   createLifeTask: (payload: object) => Promise.resolve({ id: 52, completed: false, completed_at: null, created_at: "", updated_at: "", ...payload }),
-  updateLifeTask: (id: number, payload: object) => Promise.resolve({ id, title: "Renew driver's license", category: "admin", due_at: "2026-08-02T10:30", notes: "", completed: false, completed_at: null, created_at: "", updated_at: "", ...payload }),
+  updateLifeTask: (id: number, payload: object) => Promise.resolve({ id, title: "Renew driver's license", category: "admin", due_at: "2099-01-12T10:30", notes: "", completed: false, completed_at: null, created_at: "", updated_at: "", ...payload }),
   deleteLifeTask: () => Promise.resolve(),
   loadTripPlan: () => Promise.resolve({
     id: 1,
@@ -234,6 +264,56 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "OPEN IN NEW WINDOW ↗" })).toHaveAttribute("href", "http://127.0.0.1:30141");
   });
 
+  it("opens the native Daily Agent globally without replacing Pi Web", async () => {
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    const launcher = screen.getByRole("button", { name: "Open Daily Agent" });
+    expect(launcher).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(launcher);
+
+    expect(await screen.findByRole("dialog", { name: "Daily Agent" })).toBeInTheDocument();
+    expect(await screen.findByText("test-model")).toBeInTheDocument();
+    expect(screen.getByText(/Writes always wait for confirmation/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Message Daily Agent")).toBeEnabled();
+    expect(screen.getByRole("link", { name: "AGENT" })).toHaveAttribute("href", "/agent");
+
+    fireEvent.keyDown(window, { key: "j", metaKey: true });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Daily Agent" })).not.toBeInTheDocument());
+  });
+
+  it("configures the Daily Agent model and API key from its local settings view", async () => {
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Daily Agent" }));
+    fireEvent.click(await screen.findByRole("button", { name: "SETTINGS" }));
+
+    expect(await screen.findByText("OpenAI-compatible API")).toBeInTheDocument();
+    const baseUrl = screen.getByLabelText("BASE URL");
+    const model = screen.getByLabelText("MODEL");
+    const apiKey = screen.getByLabelText("API KEY");
+    const provider = screen.getByRole("combobox", { name: /PROVIDER/ });
+    expect(baseUrl).toHaveValue("https://api.openai.com/v1");
+    expect(apiKey).toHaveAttribute("type", "password");
+    expect(screen.getByText(/No API key configured/)).toBeInTheDocument();
+
+    fireEvent.change(provider, { target: { value: "gemini" } });
+    expect(baseUrl).toHaveValue("https://generativelanguage.googleapis.com/v1beta/openai");
+    expect(model).toHaveValue("gemini-2.5-flash");
+    expect(screen.getByRole("link", { name: /GET GOOGLE GEMINI API KEY/ })).toHaveAttribute(
+      "href",
+      "https://aistudio.google.com/app/apikey",
+    );
+
+    fireEvent.change(model, { target: { value: "gpt-5-mini" } });
+    fireEvent.change(apiKey, { target: { value: "secret-used-only-in-test" } });
+    fireEvent.click(screen.getByRole("button", { name: "SAVE" }));
+
+    expect(await screen.findByText(/Saved locally/)).toBeInTheDocument();
+    expect(apiKey).toHaveValue("");
+    expect(screen.queryByDisplayValue("secret-used-only-in-test")).not.toBeInTheDocument();
+    expect(screen.getByText(/A key is saved locally/)).toBeInTheDocument();
+  });
+
   it("collects the complete Google career roadmap and every supplied resource", async () => {
     render(<MemoryRouter initialEntries={["/google-career"]}><App /></MemoryRouter>);
 
@@ -274,7 +354,7 @@ describe("App", () => {
     expect((await screen.findAllByText("Renew driver's license")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("region", { name: "Add life task" })).toBeInTheDocument();
     const lifeTimeline = screen.getByRole("region", { name: "Life timeline" });
-    const lifeCalendar = screen.getByRole("grid", { name: "August 2026 life calendar" });
+    const lifeCalendar = screen.getByRole("grid", { name: "January 2099 life calendar" });
     expect(lifeTimeline).toBeInTheDocument();
     expect(lifeCalendar).toBeInTheDocument();
     expect(screen.getByText("10:30 AM")).toBeInTheDocument();
@@ -282,7 +362,7 @@ describe("App", () => {
     expect(screen.getByText(/No Calendar or Notion sync/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Task / 事项 *"), { target: { value: "Book dentist" } });
-    fireEvent.change(screen.getByLabelText("When / 什么时候"), { target: { value: "2026-08-01T09:00" } });
+    fireEvent.change(screen.getByLabelText("When / 什么时候"), { target: { value: "2099-01-11T09:00" } });
     const notes = screen.getByLabelText("Notes / 备注（可选，可换行）");
     fireEvent.change(notes, { target: { value: "Bring insurance card\nAsk about copay" } });
     fireEvent.keyDown(notes, { key: "Enter", code: "Enter" });

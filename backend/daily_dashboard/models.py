@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, Index, Integer, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .application_lifecycle import CONTACT_STATUSES, CONTACT_TYPES, STAGES, sql_check
@@ -168,6 +168,59 @@ class ApplicationSignal(Base):
     confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
+class AgentMessage(Base):
+    """One locally persisted turn in the native Daily Agent conversation."""
+
+    __tablename__ = "agent_messages"
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'assistant')", name="ck_agent_message_role"),
+        Index("ix_agent_message_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tool_calls_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
+class AgentDraft(Base):
+    """A proposed agent write that cannot land without an explicit approval."""
+
+    __tablename__ = "agent_drafts"
+    __table_args__ = (
+        CheckConstraint("kind IN ('life_task')", name="ck_agent_draft_kind"),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'dismissed')",
+            name="ck_agent_draft_status",
+        ),
+        Index("ix_agent_draft_message_status", "message_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    message_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_messages.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+    resolved_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+
+class AgentConfiguration(Base):
+    """The local Daily Agent connection; API keys never leave the backend."""
+
+    __tablename__ = "agent_configurations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    base_url: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    api_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
     updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
 
 

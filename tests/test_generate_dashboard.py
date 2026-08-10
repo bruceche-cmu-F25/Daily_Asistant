@@ -176,7 +176,7 @@ class DashboardTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), 'Dashboard snapshot updated for http://127.0.0.1:8766/')
-        self.assertEqual(refresh_args, '')
+        self.assertEqual(refresh_args, '--no-reminders')
         self.assertEqual(opened_url, 'http://127.0.0.1:8766/')
 
 

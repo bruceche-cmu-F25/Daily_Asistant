@@ -12,6 +12,7 @@ http://127.0.0.1:8766/
 - `/life`：只在本机保存的生活事项、时间线、Someday 和完成历史；不与 Calendar/Notion 同步。
 - `/learn`：全栈 + Agentic AI 大图、5 条学习路线、Daily/Pi Web Codebase Gym、freeCodeCamp JavaScript V9、TypeScript 和项目级 Python 训练。
 - `/agent`：以独立源 iframe 嵌入本机 Pi Web，提供 Pi Agent 的 sessions、models、skills、tools 和项目文件工作区。
+- `Daily Agent`：每个页面右下角的原生业务 Agent（按钮或 `⌘J`）。它能读取今日 Snapshot、Life、求职和 NeetCode；写入只能先生成 Draft，经确认后创建本地 Life Task。
 - `/neetcode`：NeetCode 150 Roadmap、Do Now、solution/心得和多次 attempts 历史。
 - `/applications`：自动岗位队列、申请 CRM、follow-up/deadline 和只读 Gmail Inbox Copilot。
 - `/life`：本地生活时间线，以及带按日行程和内置 Google Maps 视图的当前旅行计划。
@@ -35,6 +36,29 @@ Agent Module 保持两个进程、两个 origin：Daily 只通过
 `/api/v1/pi-web/status` 检查 sidecar 是否可用，不反向代理 Pi Web API，也不直接
 控制 agent。iframe 只开放剪贴板能力；Pi Web 仍负责自己的 session、工具权限和文件访问。
 如需覆盖默认端口，可在启动前设置 `PI_WEB_PORT`，并让后端的 `PI_WEB_URL` 指向相同地址。
+
+## Daily Agent
+
+Daily Agent 和 `/agent` 中的 Pi Web 分工不同：Pi Web 是可操作项目文件的编程 Agent；Daily Agent 只理解 Daily OS 的业务数据，不拥有 shell、文件系统或任意 SQL 工具。
+
+它使用 OpenAI-compatible Chat Completions tool calling。打开右下角 Daily Agent，点击 `SETTINGS`，即可选择 OpenAI、Google Gemini、OpenRouter、Groq、DeepSeek、xAI、Mistral 或 Custom，并填写模型和 API key。每个预设会自动填入兼容的 Base URL，并提供对应的 API key portal 链接；也可以在保存前测试连接。界面配置保存在本地 SQLite，优先于环境变量；API key 保存后不会回传或重新显示在浏览器中。
+
+也可以用环境变量作为备用配置：
+
+```bash
+export DAILY_AGENT_BASE_URL="https://api.openai.com/v1"
+export DAILY_AGENT_API_KEY="..."
+export DAILY_AGENT_MODEL="gpt-5-mini"
+```
+
+未设置界面配置和 `DAILY_AGENT_*` 时会复用 `AI_TUTOR_BASE_URL`、`AI_TUTOR_API_KEY` 和 `AI_TUTOR_MODEL`。OpenAI API 用量与 ChatGPT subscription 分开计费；ChatGPT subscription 本身不提供 API key。当前工具包括：
+
+后台服务由 launchd 启动时会读取 `~/.zprofile` 和 `~/.zshrc`，因此把这些变量放在其中并重启 `com.bruce.daily-dashboard-v2` 即可；不需要把 key 写进仓库。
+
+- 读取今日 Dashboard Snapshot、Life Tasks、Applications 和 NeetCode 进度。
+- 起草 Life Task；Draft 只有在用户点击 `CONFIRM & ADD` 后才会写入 `daily_v2.db`。
+
+Calendar、Notion、Application、NeetCode 和项目文件在第一版中全部只读。对话与 Draft 保存在本地 SQLite；侧边栏中的 `CLEAR` 会先确认，再删除本地对话和未决 Draft。
 
 ## 每天 09:00
 

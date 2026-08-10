@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api_applications import router as applications_router
 from .api_ai_tutor import router as ai_tutor_router
+from .api_daily_agent import router as daily_agent_router
 from .api_application_signals import router as application_signals_router
 from .api_attempts import router as attempts_router
 from .api_job_leads import router as job_leads_router
@@ -22,6 +23,7 @@ from .snapshot import load_dashboard_snapshot
 
 app = FastAPI(title="Daily Dashboard", version="2.0.0-dev")
 app.include_router(ai_tutor_router)
+app.include_router(daily_agent_router)
 app.include_router(applications_router)
 app.include_router(application_signals_router)
 app.include_router(job_leads_router)

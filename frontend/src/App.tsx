@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-d
 
 import { loadDashboard, loadNeetCode } from "./api";
 import { BrandGlyph, brandIdentity } from "./components/BrandLogo";
+import { DailyAgent } from "./components/DailyAgent";
 import { AgentPage } from "./pages/AgentPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
@@ -265,6 +266,7 @@ export function App() {
           {location.pathname !== "/" && location.pathname !== "/roadmap" && <footer>LOCAL-FIRST / CANONICAL RUNTIME / PORT 8766</footer>}
         </div>
       </div>
+      <DailyAgent />
     </div>
   );
 }

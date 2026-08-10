@@ -15,6 +15,9 @@ Daily Assistant is a local-first personal operating system for one user on one M
 - **Application intake** — the single way an Application is created or advanced: manual entry, one-click capture from a Job Lead, or accepting an Application Signal. It owns the birth defaults and the monotonic stage-advancement rule (a terminal outcome may always be recorded; an earlier stage never regresses a later one).
 - **Application Signal** — a read-only observation from recruiting email that proposes an Application change. It has no effect until accepted.
 - **Life Task** — a user-authored personal, household, health, finance, errand or social task. It is stored locally and never imported from or exported to Calendar/Notion.
+- **Daily Agent** — the native domain agent available across every surface. It can read bounded Daily data and can only propose writes through an Agent Draft.
+- **Agent Draft** — a locally persisted proposed Life Task. It has no domain effect until the user explicitly approves it; dismissal has no side effect.
+- **Agent Configuration** — the singleton local OpenAI-compatible Base URL, model and API credential used by Daily Agent. Browser responses expose only key presence, never the credential value; environment settings remain fallback.
 - **Archived v1 data** — the read-only SQLite backup retained after the generated HTML/8765 runtime was removed. It exists only for repeat-safe migration and recovery.
 
 ## Module ownership
@@ -25,6 +28,7 @@ Daily Assistant is a local-first personal operating system for one user on one M
 - `application_intake` owns Application birth defaults, applying the `application_lifecycle` rule for manual entry, Job Lead capture and Signal acceptance.
 - `infra` owns the shared wall clock (`now_iso`) and the request-scoped database session (`get_session`), so no feature module imports another for plumbing.
 - `api_application_signals` owns confirmation-gated Application Signal decisions.
+- `api_daily_agent` owns the bounded model/tool loop, local model connection settings, conversation history and Agent Draft approval gate. It never receives filesystem or shell tools.
 - `application_signals` owns deterministic email classification; it never mutates Gmail.
 - `daily_v2.db` is the only writable application database in the canonical runtime.
 
@@ -37,3 +41,5 @@ Daily Assistant is a local-first personal operating system for one user on one M
 5. The 09:00 task refreshes the canonical snapshot and opens 8766; it does not render `today.html` or start 8765.
 6. Life Tasks remain separate from source-owned Daily Todos and are never overwritten by Source Refresh.
 7. The retired `today.html`/8765 runtime cannot be started from this repository.
+8. A Daily Agent model call cannot directly mutate domain records; the only registered write tool creates an Agent Draft.
+9. Approving a pending Agent Draft is the only Agent path that creates a Life Task, and the same Draft cannot be approved twice.

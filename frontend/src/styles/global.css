@@ -69,6 +69,127 @@ a { color: inherit; text-decoration: none; }
 .sync-button.stale { color: var(--amber); }
 .sync-button.stale::before { background: var(--amber); box-shadow: 0 0 14px var(--amber); }
 
+/* Native Daily Agent ------------------------------------------------------- */
+.daily-agent-launcher {
+  position: fixed;
+  z-index: 58;
+  right: 28px;
+  bottom: 24px;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 8px 11px;
+  border: 1px solid var(--green);
+  color: var(--ink);
+  background: rgba(4, 14, 9, .96);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .5), 0 0 24px rgba(156, 255, 112, .1);
+  cursor: pointer;
+}
+.daily-agent-launcher:hover,
+.daily-agent-launcher.active { border-color: var(--cyan); transform: translateY(-1px); }
+.daily-agent-launcher > span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--green); color: var(--green); font-size: 10px; }
+.daily-agent-launcher b { font-size: 9px; letter-spacing: .08em; }
+.daily-agent-launcher small { color: var(--muted); font-size: 8px; }
+.daily-agent-panel {
+  position: fixed;
+  z-index: 57;
+  top: 20px;
+  right: 20px;
+  bottom: 82px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(440px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--line-hot);
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(5, 15, 11, .99), rgba(2, 8, 6, .99));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .72), 0 0 0 7px rgba(3, 8, 7, .72);
+}
+.daily-agent-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+.daily-agent-panel > header span { color: var(--cyan); font-size: 7px; letter-spacing: .12em; }
+.daily-agent-panel > header h2 { margin: 4px 0 0; font-size: 20px; }
+.daily-agent-header-actions { display: flex; align-items: center; gap: 7px; }
+.daily-agent-header-actions button { min-height: 30px; padding: 6px 8px; border: 1px solid var(--line); color: var(--muted); background: transparent; cursor: pointer; }
+.daily-agent-header-actions button:last-child { width: 30px; padding: 0; color: var(--ink); font-size: 20px; }
+.daily-agent-header-actions button:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+.daily-agent-header-actions button:disabled { opacity: .35; cursor: default; }
+.daily-agent-status { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 7px; min-height: 34px; padding: 7px 15px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.daily-agent-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+.daily-agent-status.online i { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.daily-agent-status span { color: var(--ink); font-size: 8px; font-weight: 800; }
+.daily-agent-status small { overflow: hidden; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.daily-agent-settings { display: grid; align-content: start; gap: 15px; min-height: 0; padding: 18px 16px 20px; overflow-y: auto; }
+.daily-agent-settings-intro { padding: 15px; border: 1px dashed var(--line); }
+.daily-agent-settings-intro span,
+.daily-agent-settings-intro strong { display: block; }
+.daily-agent-settings-intro span { color: var(--cyan); font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.daily-agent-settings-intro strong { margin-top: 6px; color: var(--green); font-size: 14px; }
+.daily-agent-settings-intro p { margin: 9px 0 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.daily-agent-settings label { display: grid; gap: 7px; }
+.daily-agent-settings label > span { color: var(--ink); font-size: 8px; font-weight: 900; letter-spacing: .1em; }
+.daily-agent-settings input,
+.daily-agent-settings select { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(--line); outline: 0; color: var(--ink); background: #030806; font-size: 11px; }
+.daily-agent-settings input:focus,
+.daily-agent-settings select:focus { border-color: var(--green); }
+.daily-agent-settings input:disabled,
+.daily-agent-settings select:disabled { opacity: .55; }
+.daily-agent-settings label small { color: var(--muted); font-size: 8px; line-height: 1.45; }
+.daily-agent-settings label small.available { color: var(--green); }
+.daily-agent-provider-portal { justify-self: start; color: var(--cyan); font-size: 8px; font-weight: 900; letter-spacing: .06em; }
+.daily-agent-provider-portal:hover { color: var(--green); }
+.daily-agent-settings-note { padding: 10px 11px; border-left: 2px solid var(--amber); color: var(--muted); background: rgba(255, 197, 92, .04); font-size: 8px; line-height: 1.55; }
+.daily-agent-settings-success { padding: 10px; border: 1px solid rgba(156, 255, 112, .4); color: var(--green); font-size: 9px; line-height: 1.5; }
+.daily-agent-settings-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.daily-agent-settings-actions button { min-height: 36px; padding: 8px 10px; border: 1px solid var(--line); color: var(--muted); background: transparent; font-size: 8px; font-weight: 900; cursor: pointer; }
+.daily-agent-settings-actions button:first-child { border-color: var(--green); color: var(--green); background: rgba(156, 255, 112, .05); }
+.daily-agent-settings-actions button:last-child { grid-column: 1 / -1; justify-self: start; color: var(--danger); }
+.daily-agent-settings-actions button:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+.daily-agent-settings-actions button:disabled { opacity: .35; cursor: default; }
+.daily-agent-messages { min-height: 0; padding: 16px; overflow-y: auto; }
+.daily-agent-empty { padding: 20px; border: 1px dashed var(--line); color: var(--muted); line-height: 1.65; }
+.daily-agent-empty strong { color: var(--green); font-size: 13px; }
+.daily-agent-empty p { margin: 12px 0; color: var(--ink); font-size: 11px; }
+.daily-agent-empty small { font-size: 8px; }
+.daily-agent-message { margin: 0 0 14px; }
+.daily-agent-message > span { display: block; margin-bottom: 5px; color: var(--cyan); font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.daily-agent-message.user { margin-left: 36px; padding: 10px 12px; border: 1px solid var(--line); background: rgba(102, 216, 234, .035); }
+.daily-agent-message.user > span { color: var(--muted); }
+.daily-agent-message p { margin: 0; color: var(--ink); font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
+.daily-agent-message.streaming > small,
+.daily-agent-message.streaming > i { display: block; color: var(--amber); font-size: 8px; font-style: normal; letter-spacing: .06em; }
+.daily-agent-draft { margin-top: 11px; padding: 13px; border: 1px solid rgba(255, 197, 92, .45); border-left: 3px solid var(--amber); background: rgba(255, 197, 92, .045); }
+.daily-agent-draft.approved { border-color: rgba(156, 255, 112, .4); border-left-color: var(--green); }
+.daily-agent-draft.dismissed { opacity: .58; }
+.daily-agent-draft-kind,
+.daily-agent-draft strong,
+.daily-agent-draft small { display: block; }
+.daily-agent-draft-kind { margin-bottom: 7px; color: var(--amber); font-size: 7px; font-weight: 900; letter-spacing: .1em; }
+.daily-agent-draft strong { color: var(--ink); font-size: 12px; }
+.daily-agent-draft small { margin-top: 5px; color: var(--muted); font-size: 8px; }
+.daily-agent-draft p { margin-top: 8px; color: var(--muted); font-size: 10px; }
+.daily-agent-draft-actions { display: flex; gap: 7px; margin-top: 12px; }
+.daily-agent-draft-actions button { min-height: 32px; padding: 7px 9px; border: 1px solid var(--green); color: var(--green); background: rgba(156, 255, 112, .05); font-size: 8px; font-weight: 900; cursor: pointer; }
+.daily-agent-draft-actions button:last-child { border-color: var(--line); color: var(--muted); background: transparent; }
+.daily-agent-draft-actions button:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+.daily-agent-draft-result { display: block; margin-top: 10px; color: var(--green); font-size: 8px; font-weight: 900; }
+.daily-agent-inline-error,
+.daily-agent-error { color: var(--danger) !important; }
+.daily-agent-error { margin: 12px 0; padding: 10px; border: 1px solid rgba(255, 111, 97, .45); font-size: 10px; line-height: 1.5; }
+.daily-agent-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px; border-top: 1px solid var(--line); background: #030806; }
+.daily-agent-composer textarea { width: 100%; min-height: 68px; padding: 10px; resize: none; border: 1px solid var(--line); outline: none; color: var(--ink); background: rgba(255, 255, 255, .015); font: inherit; font-size: 11px; line-height: 1.5; }
+.daily-agent-composer textarea:focus { border-color: var(--green); }
+.daily-agent-composer textarea:disabled { opacity: .5; }
+.daily-agent-composer > button { align-self: stretch; min-width: 70px; border: 1px solid var(--green); color: var(--green); background: rgba(156, 255, 112, .05); font-size: 9px; font-weight: 900; cursor: pointer; }
+.daily-agent-composer > button:disabled { border-color: var(--line); color: var(--muted); cursor: default; }
+
+@media (max-width: 600px) {
+  .daily-agent-panel { inset: 8px 8px 70px; width: auto; }
+  .daily-agent-launcher { right: 14px; bottom: 12px; }
+  .daily-agent-launcher small { display: none; }
+}
+
 main { padding: 22px; }
 .panel { border: 1px solid var(--line); background: var(--panel); }
 .hero { position: relative; display: grid; grid-template-columns: 1.05fr .95fr; min-height: 430px; padding: clamp(28px, 5vw, 68px); overflow: hidden; background: radial-gradient(circle at 72% 34%, rgba(20,93,61,.28), transparent 29%), radial-gradient(circle at 50% 80%, rgba(82,35,62,.22), transparent 36%), var(--panel); }

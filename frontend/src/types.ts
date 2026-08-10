@@ -247,3 +247,23 @@ export type GmailSignalConnection = {
   status: string;
   detail: string;
 };
+
+export type DailyAgentDraft = {
+  id: number;
+  message_id: number;
+  kind: "life_task";
+  payload: LifeTaskPayload;
+  summary: string;
+  status: "pending" | "approved" | "dismissed";
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export type DailyAgentMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  tool_calls: Array<{ name: string; arguments: Record<string, unknown>; result: string }>;
+  created_at: string;
+  drafts: DailyAgentDraft[];
+};

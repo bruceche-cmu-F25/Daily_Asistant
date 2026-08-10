@@ -1,4 +1,4 @@
-import type { ApplicationSignal, AttemptStatus, CandidateProfile, DashboardSnapshot, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead, LifeTask, LifeTaskPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState, TripPlan, TripPlanPayload } from "./types";
+import type { ApplicationSignal, AttemptStatus, CandidateProfile, DailyAgentDraft, DailyAgentMessage, DashboardSnapshot, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead, LifeTask, LifeTaskPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState, TripPlan, TripPlanPayload } from "./types";
 
 export type PiWebStatus = {
   online: boolean;
@@ -33,6 +33,35 @@ export type AiTutorContext = {
   path: { title: string; titleZh: string } | null;
   mode: "explain" | "example" | "quiz" | "question";
 };
+
+export type DailyAgentStatus = {
+  configured: boolean;
+  model: string | null;
+  detail: string;
+};
+
+export type DailyAgentSettings = {
+  base_url: string;
+  model: string;
+  has_api_key: boolean;
+  has_saved_api_key: boolean;
+  source: string;
+};
+
+export type DailyAgentSettingsInput = {
+  base_url: string;
+  model: string;
+  api_key?: string;
+  clear_api_key?: boolean;
+};
+
+export type DailyAgentStreamEvent =
+  | { type: "started"; model: string }
+  | { type: "tools"; names: string[] }
+  | { type: "draft"; draft: DailyAgentDraft }
+  | { type: "text"; text: string }
+  | { type: "done"; message: DailyAgentMessage }
+  | { type: "error"; error: string };
 
 async function apiError(response: Response, fallback: string): Promise<Error> {
   const payload = await response.json().catch(() => null) as { detail?: string } | null;
@@ -100,6 +129,107 @@ export async function streamAiTutorMessage(
     }
     if (done) break;
   }
+}
+
+export async function loadDailyAgentStatus(): Promise<DailyAgentStatus> {
+  const response = await fetch("/api/v1/daily-agent/status", { cache: "no-store" });
+  if (!response.ok) throw await apiError(response, "Daily Agent status API failed");
+  return response.json() as Promise<DailyAgentStatus>;
+}
+
+export async function loadDailyAgentSettings(): Promise<DailyAgentSettings> {
+  const response = await fetch("/api/v1/daily-agent/settings", { cache: "no-store" });
+  if (!response.ok) throw await apiError(response, "Daily Agent settings API failed");
+  return response.json() as Promise<DailyAgentSettings>;
+}
+
+export async function saveDailyAgentSettings(
+  settings: DailyAgentSettingsInput,
+): Promise<DailyAgentSettings> {
+  const response = await fetch("/api/v1/daily-agent/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) throw await apiError(response, "Daily Agent settings save failed");
+  return response.json() as Promise<DailyAgentSettings>;
+}
+
+export async function testDailyAgentSettings(
+  settings: Omit<DailyAgentSettingsInput, "clear_api_key">,
+): Promise<{ ok: true; model: string }> {
+  const response = await fetch("/api/v1/daily-agent/settings/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) throw await apiError(response, "Daily Agent connection test failed");
+  return response.json() as Promise<{ ok: true; model: string }>;
+}
+
+export async function loadDailyAgentHistory(): Promise<DailyAgentMessage[]> {
+  const response = await fetch("/api/v1/daily-agent/history", { cache: "no-store" });
+  if (!response.ok) throw await apiError(response, "Daily Agent history API failed");
+  const payload = await response.json() as { messages: DailyAgentMessage[] };
+  return payload.messages;
+}
+
+export async function clearDailyAgentHistory(): Promise<void> {
+  const response = await fetch("/api/v1/daily-agent/history", { method: "DELETE" });
+  if (!response.ok) throw await apiError(response, "Daily Agent history clear failed");
+}
+
+export async function streamDailyAgentMessage(
+  message: string,
+  signal: AbortSignal,
+  onEvent: (event: DailyAgentStreamEvent) => void,
+): Promise<void> {
+  const response = await fetch("/api/v1/daily-agent/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+    signal,
+  });
+  if (!response.ok) throw await apiError(response, "Daily Agent request failed");
+  if (!response.body) throw new Error("Daily Agent stream is unavailable");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const consume = (frame: string) => {
+    const lines = frame.split(/\r?\n/);
+    const eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+    const data = lines
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!eventName || !data) return;
+    onEvent({ type: eventName, ...JSON.parse(data) } as DailyAgentStreamEvent);
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) consume(frame);
+    if (done) break;
+  }
+  if (buffer.trim()) consume(buffer);
+}
+
+export async function approveDailyAgentDraft(
+  draftId: number,
+): Promise<{ draft: DailyAgentDraft; task: LifeTask }> {
+  const response = await fetch(`/api/v1/daily-agent/drafts/${draftId}/approve`, { method: "POST" });
+  if (!response.ok) throw await apiError(response, "Daily Agent draft approval failed");
+  return response.json() as Promise<{ draft: DailyAgentDraft; task: LifeTask }>;
+}
+
+export async function dismissDailyAgentDraft(draftId: number): Promise<{ draft: DailyAgentDraft }> {
+  const response = await fetch(`/api/v1/daily-agent/drafts/${draftId}/dismiss`, { method: "POST" });
+  if (!response.ok) throw await apiError(response, "Daily Agent draft dismiss failed");
+  return response.json() as Promise<{ draft: DailyAgentDraft }>;
 }
 
 export async function loadWorkspace(problemKey: string): Promise<ProblemWorkspace> {

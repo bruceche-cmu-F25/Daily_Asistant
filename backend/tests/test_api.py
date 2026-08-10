@@ -140,6 +140,8 @@ def test_v2_launcher_starts_a_pinned_local_pi_web_sidecar():
     launcher = (PROJECT_ROOT / "bin" / "run_v2_dev.sh").read_text(encoding="utf-8")
 
     assert "@agegr/pi-web@0.8.1" in launcher
+    assert '.zprofile' in launcher
+    assert '.zshrc' in launcher
     assert "--no-open" in launcher
     assert "127.0.0.1" in launcher
     assert "30141" in launcher

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { createLifeTask, deleteLifeTask, loadLifeTasks, updateLifeTask } from "../api";
 import { TripPlanner } from "../components/TripPlanner";
@@ -135,7 +135,7 @@ export function LifePage() {
   const now = localMinuteKey();
   const [calendarMonth, setCalendarMonth] = useState(now.slice(0, 7));
 
-  useEffect(() => {
+  const refreshTasks = useCallback(() => {
     loadLifeTasks().then((items) => {
       setTasks(items);
       const dated = items
@@ -149,7 +149,13 @@ export function LifePage() {
     }).catch((reason: unknown) => {
       setError(reason instanceof Error ? reason.message : "Unable to load life timeline");
     });
-  }, []);
+  }, [now]);
+
+  useEffect(() => {
+    refreshTasks();
+    window.addEventListener("daily-agent:changed", refreshTasks);
+    return () => window.removeEventListener("daily-agent:changed", refreshTasks);
+  }, [refreshTasks]);
 
   const active = useMemo(() => tasks.filter((task) => !task.completed), [tasks]);
   const overdue = active.filter((task) => task.due_at && task.due_at < now).sort(byDueTime);
