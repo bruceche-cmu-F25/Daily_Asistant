@@ -44,7 +44,7 @@ Agent Module 保持两个进程、两个 origin：Daily 只通过
 ./bin/run_daily.sh
 ```
 
-它运行 `bin/refresh_dashboard.py`，原子更新 `data/dashboard_snapshot.json`；如果 Gmail 已授权，还会做一次只读招聘邮件扫描，最后打开 8766。Gmail 扫描失败不会阻止主页刷新。它不再生成 `today.html`，也不会启动旧 8765 服务。
+它运行 `bin/refresh_dashboard.py --no-reminders`，原子更新 `data/dashboard_snapshot.json`；如果 Gmail 已授权，还会做一次只读招聘邮件扫描，最后打开 8766。每天只在 09:00 打开一次 Dashboard，不再为每个 Calendar 事件生成额外的网页定时任务。Gmail 扫描失败不会阻止主页刷新。它不再生成 `today.html`，也不会启动旧 8765 服务。
 
 岗位刷新会保留每个匹配岗位的首次发现时间。当天首次发现且尚未提醒的岗位会由 `bin/notify_new_jobs.py` 发送一次 macOS 通知；同一天重复刷新不会重复提醒。Apply 页面同时提供 FAANG 和主要科技公司的官方 careers 直达入口，提醒数据仍明确来自公开聚合岗位源，不声称覆盖各公司官网全部职位。
 

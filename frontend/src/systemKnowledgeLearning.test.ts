@@ -13,8 +13,10 @@ describe("system knowledge learning metadata", () => {
     for (const node of systemKnowledgeNodes) {
       const learning = knowledgeNodeLearning[node.id];
       expect(learning, node.id).toBeDefined();
-      expect(learning.example.length, `${node.id} English example`).toBeGreaterThan(30);
-      expect(learning.exampleZh.length, `${node.id} Chinese example`).toBeGreaterThan(15);
+      for (const field of ["what", "why", "how"] as const) {
+        expect(learning[field].length, `${node.id} English ${field}`).toBeGreaterThan(30);
+        expect(learning[`${field}Zh`].length, `${node.id} Chinese ${field}`).toBeGreaterThan(15);
+      }
       expect(learning.resourceIds.length, `${node.id} resources`).toBeGreaterThanOrEqual(2);
       learning.resourceIds.forEach((resourceId) => {
         expect(knowledgeLearningResourceById.has(resourceId), `${node.id} -> ${resourceId}`).toBe(true);

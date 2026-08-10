@@ -757,17 +757,19 @@ export function KnowledgeMap() {
             {drawerTab === "example" && (
               <>
                 <article className="knowledge-example-card">
-                  <span>CONCRETE EXAMPLE · 具体例子</span>
-                  <p>{selectedLearning?.exampleZh ?? selectedNode.zh.proof}</p>
-                  <small>{selectedLearning?.example ?? selectedNode.proof}</small>
+                  <span>是什么 · WHAT IT IS</span>
+                  <p>{selectedLearning?.whatZh ?? selectedNode.zh.does}</p>
+                  <small>{selectedLearning?.what ?? selectedNode.does}</small>
                 </article>
                 <section>
-                  <h3>阅读例子的方式 <span>HOW TO READ IT</span></h3>
-                  <ol>
-                    <li>先找输入与期望输出。</li>
-                    <li>标出 {selectedNode.label} 真正负责的那一步。</li>
-                    <li>问它失败时，上下游分别会看到什么。</li>
-                  </ol>
+                  <h3>为什么 <span>WHY IT MATTERS</span></h3>
+                  <p>{selectedLearning?.whyZh ?? selectedNode.zh.matters}</p>
+                  <small>{selectedLearning?.why ?? selectedNode.matters}</small>
+                </section>
+                <section>
+                  <h3>怎么做的 <span>HOW IT WORKS</span></h3>
+                  <p>{selectedLearning?.howZh ?? selectedNode.zh.proof}</p>
+                  <small>{selectedLearning?.how ?? selectedNode.proof}</small>
                 </section>
                 <section>
                   <h3>设计取舍 <span>TRADEOFF</span></h3>

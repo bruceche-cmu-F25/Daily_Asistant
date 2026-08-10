@@ -197,10 +197,12 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "NEETCODE" })).toHaveAttribute("href", "/neetcode");
     expect(screen.getByRole("link", { name: "HOME" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "LEARN" })).toHaveAttribute("href", "/learn");
+    expect(screen.getByRole("link", { name: "ROADMAP" })).toHaveAttribute("href", "/roadmap");
     expect(screen.getByRole("link", { name: "PYTHON" })).toHaveAttribute("href", "/python");
     expect(screen.getByRole("link", { name: "AGENT" })).toHaveAttribute("href", "/agent");
     expect(screen.getByRole("link", { name: "LIFE" })).toHaveAttribute("href", "/life");
     expect(screen.getByRole("link", { name: "APPLY" })).toHaveAttribute("href", "/applications");
+    expect(screen.getByRole("link", { name: "GOOGLE" })).toHaveAttribute("href", "/google-career");
     expect(screen.getByRole("link", { name: "EVENTS" })).toHaveAttribute("href", "/discover");
     expect(screen.queryByRole("link", { name: "HISTORY" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "JOBS" })).not.toBeInTheDocument();
@@ -230,6 +232,41 @@ describe("App", () => {
     expect(await screen.findByText("ONLINE")).toBeInTheDocument();
     expect(screen.getByTitle("Pi Agent workspace")).toHaveAttribute("src", "http://127.0.0.1:30141");
     expect(screen.getByRole("link", { name: "OPEN IN NEW WINDOW ↗" })).toHaveAttribute("href", "http://127.0.0.1:30141");
+  });
+
+  it("collects the complete Google career roadmap and every supplied resource", async () => {
+    render(<MemoryRouter initialEntries={["/google-career"]}><App /></MemoryRouter>);
+
+    expect(screen.getByRole("heading", { name: /LAND A JOB.*AT GOOGLE/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Google’s official videos" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your application roadmap" })).toBeInTheDocument();
+    expect(screen.getByText("了解招聘流程")).toBeInTheDocument();
+    expect(screen.getByText("精准投递职位")).toBeInTheDocument();
+
+    const resourceUrls = [
+      "https://www.linkedin.com/pulse/how-land-job-google-guide-hiring-process-utkarsh-sharma-8dcmf?utm_source=share&utm_medium=member_ios&utm_campaign=share_via",
+      "https://youtu.be/we7ba0slWrc",
+      "https://youtu.be/olScOTFtVW8",
+      "https://youtu.be/TPilhhzHTnU",
+      "https://youtu.be/Ti5vfu9arXQ",
+      "https://youtu.be/563VrWhFO38",
+      "https://www.linkedin.com/pulse/how-secure-position-google-comprehensive-guide-utkarsh-sharma-guopc/",
+      "https://www.google.com/about/careers/applications/how-we-hire/#step-job-searching",
+      "https://lnkd.in/dRQGTJfs",
+      "https://www.google.com/about/careers/applications/jobs/results/",
+      "https://lnkd.in/djpnDWXu",
+      "https://youtu.be/wwIysnVmAUg",
+      "https://youtu.be/lIuHpBq4jJw",
+      "https://careers.google.com/stories/applying-to-google/",
+      "https://careers.google.com/stories/apm-application-process/",
+      "https://www.youtube.com/playlist?list=PLllx_3tLoo4c_aR8RKOOnizL5LiUH02YF",
+    ];
+
+    const renderedUrls = Array.from(document.querySelectorAll<HTMLAnchorElement>(".google-career-page a"))
+      .map((link) => link.getAttribute("href"));
+    resourceUrls.forEach((url) => expect(renderedUrls).toContain(url));
+    expect(screen.queryByRole("heading", { name: "Frontend design ideas" })).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".google-resource-card")).toHaveLength(16);
   });
 
   it("keeps personal life tasks on an isolated timeline", async () => {
@@ -447,8 +484,70 @@ describe("App", () => {
     expect(screen.getByText(/READ ONLY · NO AUTO-REGISTRATION/)).toBeInTheDocument();
   });
 
-  it("renders one full-screen bilingual knowledge map instead of the old learning modules", async () => {
+  it("restores the original Learning Hub tracks, resources, and local progress", async () => {
     render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("LearningHub");
+    expect(screen.getByTitle("JavaScript Foundations course player")).toHaveAttribute("src", expect.stringContaining("jS4aFq5-91M"));
+    expect(screen.getByRole("link", { name: /JavaScript V9/ })).toHaveAttribute("href", "https://www.freecodecamp.org/learn/javascript-v9/");
+    expect(screen.getByRole("link", { name: /FastAPI Tutorial/ })).toHaveAttribute("href", "https://fastapi.tiangolo.com/tutorial/");
+    fireEvent.click(screen.getByRole("button", { name: /Advanced TypeScript/ }));
+    expect(screen.getByTitle("Advanced TypeScript course player")).toHaveAttribute("src", expect.stringContaining("PLIvujZeVDLMx040"));
+    fireEvent.click(screen.getByRole("button", { name: /MARK TODAY DONE/ }));
+    expect(screen.getByRole("button", { name: "✓ DONE TODAY / 已完成" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("daily-dashboard:learning-progress:v1")).toContain("typescript");
+  });
+
+  it("keeps the Learning Hub customizer without the retired roadmap block", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Learning Roadmaps" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "CUSTOMIZE WITH AI" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Tell the agent what to change" }), {
+      target: { value: "隐藏课程与参考" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "PREVIEW CHANGES" }));
+    expect(screen.getByText("隐藏 Courses & References")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "APPLY 1 CHANGE" }));
+    expect(screen.queryByRole("heading", { name: "Courses & References" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "UNDO" }));
+    expect(screen.getByRole("heading", { name: "Courses & References" })).toBeInTheDocument();
+  });
+
+  it("moves all frontend design resources into the Learning Hub", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Frontend design ideas" })).toBeInTheDocument();
+
+    const resourceUrls = [
+      "https://noiced.com/",
+      "https://mnmm.xyz/",
+      "https://deck.gallery/",
+      "https://recent.design/",
+      "https://logosystem.co/",
+      "https://craft.wild.as/",
+      "https://reactbits.dev/backgrounds/dither",
+      "https://canvasui.dev/components",
+      "https://github.com/greensock/gsap",
+      "https://www.unicorn.studio/inspiration",
+    ];
+    const renderedUrls = Array.from(document.querySelectorAll<HTMLAnchorElement>(".learning-library a"))
+      .map((link) => link.getAttribute("href"));
+    resourceUrls.forEach((url) => expect(renderedUrls).toContain(url));
+  });
+
+  it("restores the actionable Learning Hub project missions", async () => {
+    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Learning Progress API" })).toBeInTheDocument();
+    const task = screen.getByRole("checkbox", { name: "Design the learning session API contract" });
+    fireEvent.click(task);
+    expect(task).toBeChecked();
+    expect(window.localStorage.getItem("daily-dashboard:project-gym:v1")).toContain("api-contract");
+    expect(screen.getByRole("heading", { name: "Project Challenges (Optional)" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /ENTER GUIDED CHANNEL/ })).toHaveAttribute("href", "https://github.com/practical-tutorials/project-based-learning#python");
+  });
+
+  it("renders the full-screen bilingual knowledge map in its own roadmap module", async () => {
+    render(<MemoryRouter initialEntries={["/roadmap"]}><App /></MemoryRouter>);
 
     expect(await screen.findByRole("region", { name: "Interactive software knowledge map" })).toBeInTheDocument();
     expect(screen.getByText("软件系统全景图")).toBeInTheDocument();
@@ -461,7 +560,7 @@ describe("App", () => {
   });
 
   it("opens a bilingual node drawer and saves simple progress", async () => {
-    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/roadmap"]}><App /></MemoryRouter>);
 
     const reactNode = await screen.findByRole("button", { name: /ReactReact/ });
     fireEvent.click(reactNode);
@@ -474,7 +573,7 @@ describe("App", () => {
   });
 
   it("uses a path overlay, search, and next-node navigation without locking nodes", async () => {
-    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/roadmap"]}><App /></MemoryRouter>);
     const path = await screen.findByRole("combobox", { name: /Learning path/ });
     fireEvent.change(path, { target: { value: "agentic-ai" } });
     expect(screen.getByText("Agentic AI Software", { selector: ".knowledge-path-bar b" })).toBeInTheDocument();
@@ -490,7 +589,7 @@ describe("App", () => {
   });
 
   it("keeps external links in one verified resources drawer", async () => {
-    render(<MemoryRouter initialEntries={["/learn"]}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/roadmap"]}><App /></MemoryRouter>);
     fireEvent.click(await screen.findByRole("button", { name: /RESOURCES/ }));
     expect(screen.getByRole("complementary", { name: "Learning resources" })).toBeInTheDocument();
     expect(screen.getAllByText("VERIFIED 2026-07-26")).toHaveLength(10);

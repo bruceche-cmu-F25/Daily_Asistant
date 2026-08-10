@@ -12,7 +12,7 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
   PYTHON_BIN="$(command -v python3)"
 fi
 
-if "$BASE/bin/refresh_dashboard.py" >> "$BASE/run.log" 2>> "$BASE/run.err"; then
+if "$BASE/bin/refresh_dashboard.py" --no-reminders >> "$BASE/run.log" 2>> "$BASE/run.err"; then
   print -r -- "Dashboard snapshot updated for $DASHBOARD_URL"
 else
   status=$?

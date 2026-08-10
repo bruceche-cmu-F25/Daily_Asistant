@@ -1,4 +1,4 @@
-export type ModuleId = "life" | "learn" | "python" | "agent" | "neetcode" | "applications" | "discover";
+export type ModuleId = "life" | "learn" | "roadmap" | "python" | "agent" | "neetcode" | "applications" | "google-career" | "discover";
 
 export type ModuleDefinition = {
   id: ModuleId;
@@ -25,6 +25,14 @@ export const moduleRegistry: ModuleDefinition[] = [
     title: "Learning Hub",
     description: "Courses, daily learning, projects, and progress.",
     capabilities: ["progress", "courses", "projects", "customizable-layout"],
+  },
+  {
+    id: "roadmap",
+    path: "/roadmap",
+    navLabel: "ROADMAP",
+    title: "System Roadmap",
+    description: "Interactive software knowledge map and guided paths.",
+    capabilities: ["knowledge-map", "guided-paths", "progress"],
   },
   {
     id: "python",
@@ -57,6 +65,14 @@ export const moduleRegistry: ModuleDefinition[] = [
     title: "Job Search",
     description: "Job discovery, applications, follow-ups, and signals.",
     capabilities: ["job-feed", "application-crm", "follow-ups"],
+  },
+  {
+    id: "google-career",
+    path: "/google-career",
+    navLabel: "GOOGLE",
+    title: "Google Career",
+    description: "Hiring roadmap, interview prep, and official resources.",
+    capabilities: ["career-roadmap", "interview-prep", "official-resources"],
   },
   {
     id: "discover",
