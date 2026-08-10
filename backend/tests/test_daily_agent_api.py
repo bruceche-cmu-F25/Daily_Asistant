@@ -34,26 +34,42 @@ def test_daily_agent_drafts_before_approval_and_only_lands_once(tmp_path, monkey
         nonlocal calls
         calls += 1
         if calls == 1:
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [{
-                    "id": "call-draft-1",
-                    "type": "function",
-                    "function": {
-                        "name": "draft_life_task",
-                        "arguments": json.dumps({
-                            "title": "Book dentist",
-                            "category": "health",
-                            "due_at": "2026-08-12T09:30",
-                            "notes": "Bring insurance card",
-                        }),
-                    },
-                }],
-            }
+            return api_daily_agent.ModelResponse(
+                message={
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{
+                        "id": "call-draft-1",
+                        "type": "function",
+                        "function": {
+                            "name": "draft_life_task",
+                            "arguments": json.dumps({
+                                "title": "Book dentist",
+                                "category": "health",
+                                "due_at": "2026-08-12T09:30",
+                                "notes": "Bring insurance card",
+                            }),
+                        },
+                    }],
+                },
+                usage={
+                    "prompt_tokens": 10,
+                    "completion_tokens": 2,
+                    "total_tokens": 12,
+                    "cached_tokens": 3,
+                },
+            )
         assert messages[-1]["role"] == "tool"
         assert "requires explicit approval" in messages[-1]["content"]
-        return {"role": "assistant", "content": "已起草；确认卡片后才会写入 Life。"}
+        return api_daily_agent.ModelResponse(
+            message={"role": "assistant", "content": "已起草；确认卡片后才会写入 Life。"},
+            usage={
+                "prompt_tokens": 20,
+                "completion_tokens": 5,
+                "total_tokens": 25,
+                "cached_tokens": 0,
+            },
+        )
 
     app.dependency_overrides[get_session] = override_session
     monkeypatch.setenv("DAILY_AGENT_API_KEY", "test-key")
@@ -72,6 +88,18 @@ def test_daily_agent_drafts_before_approval_and_only_lands_once(tmp_path, monkey
         history = request("GET", "/api/v1/daily-agent/history").json()["messages"]
         assert [message["role"] for message in history] == ["user", "assistant"]
         draft = history[-1]["drafts"][0]
+        trace = history[-1]["trace"]
+        assert trace["status"] == "completed"
+        assert trace["model"] == "test-model"
+        assert trace["model_calls"] == 2
+        assert trace["tool_calls"] == 1
+        assert trace["prompt_tokens"] == 30
+        assert trace["completion_tokens"] == 7
+        assert trace["total_tokens"] == 37
+        assert trace["cached_tokens"] == 3
+        assert trace["rounds"][0]["tools"] == ["draft_life_task"]
+        assert trace["rounds"][1]["tools"] == []
+        assert trace["duration_ms"] >= 0
         assert draft["status"] == "pending"
         assert draft["payload"]["title"] == "Book dentist"
         assert request("GET", "/api/v1/life-tasks").json()["items"] == []
@@ -312,6 +340,70 @@ def test_daily_agent_openai_gpt_5_6_tools_use_reasoning_none():
         has_saved_api_key=True,
     )
     assert "reasoning_effort" not in api_daily_agent._model_request_body(gemini, [])
+
+
+def test_daily_agent_normalizes_provider_usage_without_inventing_missing_tokens():
+    assert api_daily_agent._normalize_usage({
+        "prompt_tokens": 100,
+        "completion_tokens": 25,
+        "prompt_tokens_details": {"cached_tokens": 40},
+    }) == {
+        "prompt_tokens": 100,
+        "completion_tokens": 25,
+        "total_tokens": 125,
+        "cached_tokens": 40,
+    }
+    assert api_daily_agent._normalize_usage({
+        "input_tokens": 60,
+        "output_tokens": 15,
+        "input_tokens_details": {"cached_tokens": 8},
+    }) == {
+        "prompt_tokens": 60,
+        "completion_tokens": 15,
+        "total_tokens": 75,
+        "cached_tokens": 8,
+    }
+    assert api_daily_agent._normalize_usage(None) == {
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+        "cached_tokens": None,
+    }
+
+
+def test_daily_agent_persists_failed_model_trace(tmp_path, monkeypatch):
+    database = tmp_path / "daily_v2.db"
+    upgrade_database(database)
+
+    def override_session():
+        with Session(make_engine(database)) as session:
+            yield session
+
+    async def fake_model(_settings, _messages):
+        raise ValueError("upstream body intentionally omitted")
+
+    app.dependency_overrides[get_session] = override_session
+    monkeypatch.setenv("DAILY_AGENT_API_KEY", "test-key")
+    monkeypatch.setenv("DAILY_AGENT_MODEL", "test-model")
+    monkeypatch.setattr(api_daily_agent, "_call_model", fake_model)
+    try:
+        response = request(
+            "POST",
+            "/api/v1/daily-agent/chat/stream",
+            {"message": "What is on today?"},
+        )
+        assert response.status_code == 200
+        assert "event: error" in response.text
+        history = request("GET", "/api/v1/daily-agent/history").json()["messages"]
+        trace = history[-1]["trace"]
+        assert trace["status"] == "failed"
+        assert trace["error_type"] == "ValueError"
+        assert trace["model_calls"] == 1
+        assert trace["total_tokens"] is None
+        assert trace["rounds"][0]["status"] == "failed"
+        assert "upstream body intentionally omitted" not in json.dumps(trace)
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_daily_agent_caps_drafts_and_returns_a_result_for_every_tool_call(tmp_path, monkeypatch):

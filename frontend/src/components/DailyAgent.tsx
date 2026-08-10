@@ -14,7 +14,7 @@ import {
   type DailyAgentStatus,
   type DailyAgentStreamEvent,
 } from "../api";
-import type { DailyAgentDraft, DailyAgentMessage } from "../types";
+import type { DailyAgentDraft, DailyAgentMessage, DailyAgentTrace } from "../types";
 
 
 const emptyStatus: DailyAgentStatus = {
@@ -156,6 +156,69 @@ function MessageContent({ content }: { content: string }) {
   return <div className="daily-agent-message-content">{blocks}</div>;
 }
 
+function traceTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("zh-CN", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function traceDuration(milliseconds: number) {
+  if (milliseconds < 1_000) return `${milliseconds} MS`;
+  return `${(milliseconds / 1_000).toFixed(milliseconds < 10_000 ? 1 : 0)} S`;
+}
+
+function tokenCount(value: number | null) {
+  return value === null ? "N/A" : new Intl.NumberFormat("en-US").format(value);
+}
+
+function MessageTrace({ createdAt, trace }: { createdAt: string; trace?: DailyAgentTrace | null }) {
+  return (
+    <footer className={`daily-agent-trace${trace?.status === "failed" ? " failed" : ""}`}>
+      <div className="daily-agent-trace-summary">
+        <time dateTime={createdAt}>{traceTime(createdAt)}</time>
+        {trace && (
+          <>
+            <b>{traceDuration(trace.duration_ms)}</b>
+            <b>{tokenCount(trace.total_tokens)} TOKENS</b>
+            <b>{trace.model_calls} MODEL {trace.model_calls === 1 ? "CALL" : "CALLS"}</b>
+            <b>{trace.tool_calls} TOOL {trace.tool_calls === 1 ? "CALL" : "CALLS"}</b>
+          </>
+        )}
+      </div>
+      {trace?.rounds.length ? (
+        <details>
+          <summary>MODEL TRACE <span aria-hidden="true">＋</span></summary>
+          <div className="daily-agent-trace-rounds">
+            {trace.rounds.map((round) => (
+              <div className="daily-agent-trace-round" key={round.round}>
+                <div>
+                  <strong>ROUND {round.round}</strong>
+                  <em>{round.status.toUpperCase()}</em>
+                  <time dateTime={round.started_at}>{traceTime(round.started_at)}</time>
+                </div>
+                <p>
+                  <span>{traceDuration(round.duration_ms)}</span>
+                  <span>IN {tokenCount(round.prompt_tokens)}</span>
+                  <span>OUT {tokenCount(round.completion_tokens)}</span>
+                  {round.cached_tokens !== null && <span>CACHE {tokenCount(round.cached_tokens)}</span>}
+                </p>
+                {round.tools.length > 0 && (
+                  <small>TOOLS · {round.tools.join(" · ")}</small>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </footer>
+  );
+}
+
 function DraftCard({
   draft,
   onResolve,
@@ -208,6 +271,8 @@ export function DailyAgent() {
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [activeTools, setActiveTools] = useState<string[]>([]);
+  const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
+  const [runElapsedMs, setRunElapsedMs] = useState(0);
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(emptySettings);
   const [providerId, setProviderId] = useState<ProviderId>("openai");
@@ -249,6 +314,14 @@ export function DailyAgent() {
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages, streamingText, activeTools]);
 
+  useEffect(() => {
+    if (!loading || !runStartedAt) return;
+    const started = Date.now();
+    setRunElapsedMs(0);
+    const timer = window.setInterval(() => setRunElapsedMs(Date.now() - started), 100);
+    return () => window.clearInterval(timer);
+  }, [loading, runStartedAt]);
+
   const updateDraft = (resolved: DailyAgentDraft) => {
     setMessages((current) => current.map((message) => ({
       ...message,
@@ -272,6 +345,7 @@ export function DailyAgent() {
     setInput("");
     setError("");
     setStreamingText("");
+    setRunStartedAt(new Date().toISOString());
     setLoading(true);
     const controller = new AbortController();
     abortRef.current = controller;
@@ -293,6 +367,8 @@ export function DailyAgent() {
     } finally {
       setActiveTools([]);
       setLoading(false);
+      setRunStartedAt(null);
+      setRunElapsedMs(0);
       abortRef.current = null;
     }
   };
@@ -543,6 +619,7 @@ export function DailyAgent() {
                 <span>{message.role === "user" ? "YOU" : "DAILY"}</span>
                 <MessageContent content={message.content} />
                 {message.drafts.map((draft) => <DraftCard draft={draft} onResolve={updateDraft} key={draft.id} />)}
+                <MessageTrace createdAt={message.created_at} trace={message.role === "assistant" ? message.trace : null} />
               </article>
             ))}
             {(streamingText || loading) && (
@@ -550,6 +627,15 @@ export function DailyAgent() {
                 <span>DAILY</span>
                 {activeTools.length ? <small>USING {activeTools.join(", ").toUpperCase()}…</small> : null}
                 {streamingText ? <MessageContent content={streamingText} /> : <i>Thinking…</i>}
+                {runStartedAt && (
+                  <footer className="daily-agent-trace active">
+                    <div className="daily-agent-trace-summary">
+                      <time dateTime={runStartedAt}>{traceTime(runStartedAt)}</time>
+                      <b>{traceDuration(runElapsedMs)}</b>
+                      <b>{activeTools.length ? `${activeTools.length} ACTIVE TOOLS` : "MODEL ACTIVE"}</b>
+                    </div>
+                  </footer>
+                )}
               </article>
             )}
             {error && <div className="daily-agent-error" role="alert">{error}</div>}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
@@ -78,6 +79,12 @@ class AgentSettings:
         return bool(self.api_key and self.model)
 
 
+@dataclass(frozen=True)
+class ModelResponse:
+    message: dict[str, Any]
+    usage: dict[str, int | None]
+
+
 def _clean_base_url(value: str) -> str:
     value = value.strip().rstrip("/")
     if not value.startswith(("https://", "http://")):
@@ -144,11 +151,13 @@ def draft_dict(draft: AgentDraft) -> dict[str, Any]:
 
 
 def message_dict(message: AgentMessage, drafts: list[AgentDraft] | None = None) -> dict[str, Any]:
+    trace = json.loads(message.trace_json or "{}")
     return {
         "id": message.id,
         "role": message.role,
         "content": message.content,
         "tool_calls": json.loads(message.tool_calls_json),
+        "trace": trace or None,
         "created_at": message.created_at,
         "drafts": [draft_dict(draft) for draft in (drafts or [])],
     }
@@ -338,7 +347,74 @@ def _model_request_body(
     return request_body
 
 
-async def _call_model(settings: AgentSettings, messages: list[dict[str, Any]]) -> dict[str, Any]:
+def _usage_int(usage: dict[str, Any], *paths: tuple[str, ...]) -> int | None:
+    for path in paths:
+        value: Any = usage
+        for key in path:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    return None
+
+
+def _normalize_usage(raw_usage: Any) -> dict[str, int | None]:
+    usage = raw_usage if isinstance(raw_usage, dict) else {}
+    prompt_tokens = _usage_int(usage, ("prompt_tokens",), ("input_tokens",))
+    completion_tokens = _usage_int(usage, ("completion_tokens",), ("output_tokens",))
+    total_tokens = _usage_int(usage, ("total_tokens",))
+    if total_tokens is None and prompt_tokens is not None and completion_tokens is not None:
+        total_tokens = prompt_tokens + completion_tokens
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "cached_tokens": _usage_int(
+            usage,
+            ("prompt_tokens_details", "cached_tokens"),
+            ("input_tokens_details", "cached_tokens"),
+            ("cache_read_input_tokens",),
+        ),
+    }
+
+
+def _sum_round_usage(rounds: list[dict[str, Any]], key: str) -> int | None:
+    values = [item[key] for item in rounds if isinstance(item.get(key), int)]
+    return sum(values) if values else None
+
+
+def _trace_payload(
+    *,
+    settings: AgentSettings,
+    status: str,
+    started_at: str,
+    started_timer: float,
+    rounds: list[dict[str, Any]],
+    tool_calls: int,
+    error_type: str | None = None,
+) -> dict[str, Any]:
+    trace: dict[str, Any] = {
+        "status": status,
+        "model": settings.model,
+        "started_at": started_at,
+        "completed_at": now_iso(),
+        "duration_ms": max(0, round((time.perf_counter() - started_timer) * 1_000)),
+        "model_calls": len(rounds),
+        "prompt_tokens": _sum_round_usage(rounds, "prompt_tokens"),
+        "completion_tokens": _sum_round_usage(rounds, "completion_tokens"),
+        "total_tokens": _sum_round_usage(rounds, "total_tokens"),
+        "cached_tokens": _sum_round_usage(rounds, "cached_tokens"),
+        "tool_calls": tool_calls,
+        "rounds": rounds,
+    }
+    if error_type:
+        trace["error_type"] = error_type
+    return trace
+
+
+async def _call_model(settings: AgentSettings, messages: list[dict[str, Any]]) -> ModelResponse:
     timeout = httpx.Timeout(connect=10.0, read=90.0, write=15.0, pool=10.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(
@@ -352,7 +428,10 @@ async def _call_model(settings: AgentSettings, messages: list[dict[str, Any]]) -
         response.raise_for_status()
         payload = response.json()
     try:
-        return payload["choices"][0]["message"]
+        return ModelResponse(
+            message=payload["choices"][0]["message"],
+            usage=_normalize_usage(payload.get("usage")),
+        )
     except (KeyError, IndexError, TypeError) as error:
         raise ValueError("Model response did not contain a message") from error
 
@@ -422,13 +501,17 @@ async def _run_turn(
         role="user",
         content=request.message.strip(),
         tool_calls_json="[]",
+        trace_json="{}",
         created_at=now_iso(),
     )
+    trace_started_at = now_iso()
+    trace_started_timer = time.perf_counter()
     assistant = AgentMessage(
         role="assistant",
         content="",
         tool_calls_json="[]",
-        created_at=now_iso(),
+        trace_json="{}",
+        created_at=trace_started_at,
     )
     session.add_all([user, assistant])
     session.commit()
@@ -444,13 +527,55 @@ async def _run_turn(
     messages.append({"role": "user", "content": user.content})
     used: list[dict[str, Any]] = []
     made: list[AgentDraft] = []
+    trace_rounds: list[dict[str, Any]] = []
     reply = ""
-    yield _sse("started", {"model": settings.model})
+    yield _sse("started", {"model": settings.model, "started_at": trace_started_at})
 
     try:
-        for _ in range(MAX_TOOL_ROUNDS):
-            model_message = await _call_model(settings, messages)
+        for round_index in range(1, MAX_TOOL_ROUNDS + 1):
+            round_started_at = now_iso()
+            round_started_timer = time.perf_counter()
+            try:
+                raw_response = await _call_model(settings, messages)
+            except (httpx.HTTPError, ValueError):
+                trace_rounds.append(
+                    {
+                        "round": round_index,
+                        "status": "failed",
+                        "started_at": round_started_at,
+                        "completed_at": now_iso(),
+                        "duration_ms": max(
+                            0, round((time.perf_counter() - round_started_timer) * 1_000)
+                        ),
+                        **_normalize_usage(None),
+                        "tools": [],
+                    }
+                )
+                raise
+            if isinstance(raw_response, ModelResponse):
+                model_message = raw_response.message
+                usage = raw_response.usage
+            else:
+                # Keeps local test doubles and older integrations compatible.
+                model_message = raw_response
+                usage = _normalize_usage(None)
             tool_calls = model_message.get("tool_calls") or []
+            names = [
+                str(call.get("function", {}).get("name", "unknown")) for call in tool_calls
+            ]
+            trace_rounds.append(
+                {
+                    "round": round_index,
+                    "status": "completed",
+                    "started_at": round_started_at,
+                    "completed_at": now_iso(),
+                    "duration_ms": max(
+                        0, round((time.perf_counter() - round_started_timer) * 1_000)
+                    ),
+                    **usage,
+                    "tools": names,
+                }
+            )
             text = _content_text(model_message.get("content"))
             if not tool_calls:
                 reply = text
@@ -463,7 +588,6 @@ async def _run_turn(
                     "tool_calls": tool_calls,
                 }
             )
-            names = [str(call.get("function", {}).get("name", "unknown")) for call in tool_calls]
             yield _sse("tools", {"names": names})
             for index, call in enumerate(tool_calls):
                 function = call.get("function", {})
@@ -508,6 +632,18 @@ async def _run_turn(
         reply = f"Daily Agent 暂时无法完成这次请求：{error.__class__.__name__}。"
         assistant.content = reply
         assistant.tool_calls_json = json.dumps(used, ensure_ascii=False)
+        assistant.trace_json = json.dumps(
+            _trace_payload(
+                settings=settings,
+                status="failed",
+                started_at=trace_started_at,
+                started_timer=trace_started_timer,
+                rounds=trace_rounds,
+                tool_calls=len(used),
+                error_type=error.__class__.__name__,
+            ),
+            ensure_ascii=False,
+        )
         session.commit()
         yield _sse("error", {"error": reply})
         return
@@ -516,6 +652,17 @@ async def _run_turn(
         reply = "已起草，确认卡片后才会写入 Life。" if made else "这次没有得到可用结果，请换一种说法。"
     assistant.content = reply
     assistant.tool_calls_json = json.dumps(used, ensure_ascii=False)
+    assistant.trace_json = json.dumps(
+        _trace_payload(
+            settings=settings,
+            status="completed",
+            started_at=trace_started_at,
+            started_timer=trace_started_timer,
+            rounds=trace_rounds,
+            tool_calls=len(used),
+        ),
+        ensure_ascii=False,
+    )
     session.commit()
     session.refresh(assistant)
     current_drafts = session.scalars(

@@ -184,6 +184,7 @@ class AgentMessage(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     tool_calls_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    trace_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[str] = mapped_column(String(40), nullable=False)
 
 

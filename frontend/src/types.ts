@@ -259,11 +259,41 @@ export type DailyAgentDraft = {
   resolved_at: string | null;
 };
 
+export type DailyAgentTraceRound = {
+  round: number;
+  status: "completed" | "failed";
+  started_at: string;
+  completed_at: string;
+  duration_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  cached_tokens: number | null;
+  tools: string[];
+};
+
+export type DailyAgentTrace = {
+  status: "completed" | "failed";
+  model: string;
+  started_at: string;
+  completed_at: string;
+  duration_ms: number;
+  model_calls: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  cached_tokens: number | null;
+  tool_calls: number;
+  rounds: DailyAgentTraceRound[];
+  error_type?: string;
+};
+
 export type DailyAgentMessage = {
   id: number;
   role: "user" | "assistant";
   content: string;
   tool_calls: Array<{ name: string; arguments: Record<string, unknown>; result: string }>;
+  trace?: DailyAgentTrace | null;
   created_at: string;
   drafts: DailyAgentDraft[];
 };

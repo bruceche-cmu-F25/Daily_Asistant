@@ -56,7 +56,7 @@ export type DailyAgentSettingsInput = {
 };
 
 export type DailyAgentStreamEvent =
-  | { type: "started"; model: string }
+  | { type: "started"; model: string; started_at?: string }
   | { type: "tools"; names: string[] }
   | { type: "draft"; draft: DailyAgentDraft }
   | { type: "text"; text: string }
