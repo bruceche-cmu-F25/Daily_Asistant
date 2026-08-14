@@ -1,12 +1,17 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   approveDailyAgentDraft,
   clearDailyAgentHistory,
+  createDailyAgentSession,
+  deleteDailyAgentSession,
   dismissDailyAgentDraft,
   loadDailyAgentHistory,
+  loadDailyAgentSessions,
   loadDailyAgentSettings,
   loadDailyAgentStatus,
+  renameDailyAgentSession,
   saveDailyAgentSettings,
   streamDailyAgentMessage,
   testDailyAgentSettings,
@@ -14,7 +19,7 @@ import {
   type DailyAgentStatus,
   type DailyAgentStreamEvent,
 } from "../api";
-import type { DailyAgentDraft, DailyAgentMessage, DailyAgentTrace } from "../types";
+import type { DailyAgentDraft, DailyAgentMessage, DailyAgentSession, DailyAgentTrace } from "../types";
 
 
 const emptyStatus: DailyAgentStatus = {
@@ -264,8 +269,12 @@ function DraftCard({
 
 export function DailyAgent() {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "settings">("chat");
+  const [view, setView] = useState<"chat" | "settings" | "help">("chat");
   const [status, setStatus] = useState(emptyStatus);
+  const [sessions, setSessions] = useState<DailyAgentSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessionBusy, setSessionBusy] = useState(false);
   const [messages, setMessages] = useState<DailyAgentMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -286,6 +295,9 @@ export function DailyAgent() {
   const [settingsNotice, setSettingsNotice] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const historyRequestRef = useRef(0);
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -301,13 +313,70 @@ export function DailyAgent() {
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : launcherRef.current;
+    document.body.classList.add("daily-agent-open");
+    const focusFrame = window.requestAnimationFrame(() => {
+      panelRef.current?.querySelector<HTMLElement>("[data-agent-initial-focus]")?.focus();
+    });
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled):not([tabindex="-1"]), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getAttribute("aria-hidden") !== "true" && element.getClientRects().length > 0);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", trapFocus);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", trapFocus);
+      document.body.classList.remove("daily-agent-open");
+      previousFocus?.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     setError("");
-    Promise.all([loadDailyAgentStatus(), loadDailyAgentHistory()])
-      .then(([nextStatus, history]) => {
+    setSessionBusy(true);
+    const requestId = ++historyRequestRef.current;
+    void (async () => {
+      try {
+        const [nextStatus, loadedSessions] = await Promise.all([
+          loadDailyAgentStatus(),
+          loadDailyAgentSessions(),
+        ]);
+        let nextSessions = loadedSessions;
+        let nextActive = activeSessionId !== null
+          ? loadedSessions.find((item) => item.id === activeSessionId) ?? null
+          : null;
+        if (!nextActive) nextActive = loadedSessions[0] ?? null;
+        if (!nextActive) {
+          nextActive = await createDailyAgentSession();
+          nextSessions = [nextActive];
+        }
+        const history = await loadDailyAgentHistory(nextActive.id);
+        if (requestId !== historyRequestRef.current) return;
         setStatus(nextStatus);
+        setSessions(nextSessions);
+        setActiveSessionId(nextActive.id);
         setMessages(history);
-      })
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unable to load Daily Agent"));
+      } catch (reason) {
+        if (requestId === historyRequestRef.current) {
+          setError(reason instanceof Error ? reason.message : "Unable to load Daily Agent");
+        }
+      } finally {
+        if (requestId === historyRequestRef.current) setSessionBusy(false);
+      }
+    })();
   }, [open]);
 
   useEffect(() => {
@@ -329,12 +398,101 @@ export function DailyAgent() {
     })));
   };
 
+  const activeSession = sessions.find((item) => item.id === activeSessionId) ?? null;
+
+  const switchSession = async (sessionId: number) => {
+    if (loading || sessionBusy) return;
+    if (sessionId === activeSessionId) {
+      setSessionsOpen(false);
+      return;
+    }
+    const requestId = ++historyRequestRef.current;
+    setSessionBusy(true);
+    setError("");
+    setStreamingText("");
+    try {
+      const history = await loadDailyAgentHistory(sessionId);
+      if (requestId !== historyRequestRef.current) return;
+      setActiveSessionId(sessionId);
+      setMessages(history);
+      setSessionsOpen(false);
+    } catch (reason) {
+      if (requestId === historyRequestRef.current) {
+        setError(reason instanceof Error ? reason.message : "Unable to switch chat");
+      }
+    } finally {
+      if (requestId === historyRequestRef.current) setSessionBusy(false);
+    }
+  };
+
+  const addSession = async () => {
+    if (loading || sessionBusy) return;
+    setSessionBusy(true);
+    setError("");
+    try {
+      const created = await createDailyAgentSession();
+      setSessions((current) => [created, ...current]);
+      setActiveSessionId(created.id);
+      setMessages([]);
+      setStreamingText("");
+      setSessionsOpen(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to create chat");
+    } finally {
+      setSessionBusy(false);
+    }
+  };
+
+  const editSessionTitle = async () => {
+    if (!activeSession || loading || sessionBusy) return;
+    const title = window.prompt("Rename this chat", activeSession.title)?.trim();
+    if (!title || title === activeSession.title) return;
+    setSessionBusy(true);
+    setError("");
+    try {
+      const renamed = await renameDailyAgentSession(activeSession.id, title);
+      setSessions((current) => current.map((item) => item.id === renamed.id ? renamed : item));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to rename chat");
+    } finally {
+      setSessionBusy(false);
+    }
+  };
+
+  const removeSession = async () => {
+    if (!activeSession || loading || sessionBusy) return;
+    if (!window.confirm(`Delete “${activeSession.title}” and all of its messages and drafts?`)) return;
+    setSessionBusy(true);
+    setError("");
+    try {
+      await deleteDailyAgentSession(activeSession.id);
+      let remaining = sessions.filter((item) => item.id !== activeSession.id);
+      let next = remaining[0] ?? null;
+      if (!next) {
+        next = await createDailyAgentSession();
+        remaining = [next];
+      }
+      const history = await loadDailyAgentHistory(next.id);
+      setSessions(remaining);
+      setActiveSessionId(next.id);
+      setMessages(history);
+      setStreamingText("");
+      setSessionsOpen(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to delete chat");
+    } finally {
+      setSessionBusy(false);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const text = input.trim();
-    if (!text || loading || !status.configured) return;
+    if (!text || loading || !status.configured || activeSessionId === null) return;
+    const sessionId = activeSessionId;
     const optimistic: DailyAgentMessage = {
       id: -Date.now(),
+      session_id: sessionId,
       role: "user",
       content: text,
       tool_calls: [],
@@ -350,12 +508,17 @@ export function DailyAgent() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      await streamDailyAgentMessage(text, controller.signal, (streamEvent: DailyAgentStreamEvent) => {
+      await streamDailyAgentMessage(sessionId, text, controller.signal, (streamEvent: DailyAgentStreamEvent) => {
         if (streamEvent.type === "tools") setActiveTools(streamEvent.names);
         if (streamEvent.type === "text") setStreamingText(streamEvent.text);
         if (streamEvent.type === "error") setError(streamEvent.error);
       });
-      setMessages(await loadDailyAgentHistory());
+      const [history, nextSessions] = await Promise.all([
+        loadDailyAgentHistory(sessionId),
+        loadDailyAgentSessions(),
+      ]);
+      setMessages(history);
+      setSessions(nextSessions);
       setStreamingText("");
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === "AbortError") {
@@ -363,7 +526,7 @@ export function DailyAgent() {
       } else {
         setError(reason instanceof Error ? reason.message : "Daily Agent request failed");
       }
-      setMessages(await loadDailyAgentHistory().catch(() => messages));
+      setMessages(await loadDailyAgentHistory(sessionId).catch(() => messages));
     } finally {
       setActiveTools([]);
       setLoading(false);
@@ -374,11 +537,19 @@ export function DailyAgent() {
   };
 
   const clear = async () => {
-    if (!window.confirm("Clear the local Daily Agent conversation and its unresolved drafts?")) return;
-    await clearDailyAgentHistory();
-    setMessages([]);
-    setStreamingText("");
-    setError("");
+    if (activeSessionId === null || loading || sessionBusy) return;
+    if (!window.confirm("Clear this chat and its unresolved drafts? Other chats will be kept.")) return;
+    setSessionBusy(true);
+    try {
+      await clearDailyAgentHistory(activeSessionId);
+      setMessages([]);
+      setStreamingText("");
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to clear chat");
+    } finally {
+      setSessionBusy(false);
+    }
   };
 
   const refreshStatus = async () => setStatus(await loadDailyAgentStatus());
@@ -480,9 +651,10 @@ export function DailyAgent() {
   return (
     <>
       <button
+        ref={launcherRef}
         className={`daily-agent-launcher${open ? " active" : ""}`}
         type="button"
-        aria-label={open ? "Close Daily Agent" : "Open Daily Agent"}
+        aria-label="Open Daily Agent"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
@@ -490,24 +662,24 @@ export function DailyAgent() {
         <b>DAILY AGENT</b>
         <small>⌘J</small>
       </button>
-      {open && (
-        <aside className="daily-agent-panel" role="dialog" aria-label="Daily Agent" aria-modal="false">
+      {open && createPortal(
+        <aside ref={panelRef} className="daily-agent-panel" role="dialog" aria-label="Daily Agent" aria-modal="true">
           <header>
             <div className="daily-agent-title">
-              <span>LOCAL · DOMAIN-SCOPED</span>
-              <h2>Daily Agent</h2>
-              <small>YOUR DAILY OS COPILOT</small>
+              <span>LOCAL RUNTIME / SESSION ATTACHED</span>
+              <h2><b aria-hidden="true">&gt;_</b> daily-agent</h2>
+              <small>INTERACTIVE DAILY SHELL</small>
             </div>
             <div className="daily-agent-header-actions">
               {view === "chat" ? (
                 <>
                   <button type="button" onClick={() => void openSettings()}>SETTINGS</button>
-                  <button type="button" onClick={() => void clear()} disabled={!messages.length}>CLEAR</button>
+                  <button type="button" onClick={() => void clear()} disabled={!messages.length || loading || sessionBusy}>CLEAR</button>
                 </>
               ) : (
                 <button type="button" onClick={() => setView("chat")}>← BACK</button>
               )}
-              <button type="button" aria-label="Close Daily Agent" onClick={() => setOpen(false)}>×</button>
+              <button data-agent-initial-focus type="button" aria-label="Close Daily Agent" onClick={() => setOpen(false)}>×</button>
             </div>
           </header>
           <div className={`daily-agent-status ${status.configured ? "online" : "offline"}`}>
@@ -518,7 +690,51 @@ export function DailyAgent() {
             </div>
             <em>{status.configured ? "READY" : "SETUP REQUIRED"}</em>
           </div>
-          {view === "settings" ? (
+          {view === "help" ? (
+            <section className="daily-agent-help" aria-label="Daily Agent capabilities">
+              <div className="daily-agent-help-intro">
+                <span>REFERENCE / REGISTERED TOOLS</span>
+                <h3><b aria-hidden="true">$</b> daily-agent --help</h3>
+                <p>Use natural language. Current Dashboard data is read through registered local tools before answering.</p>
+              </div>
+              <div className="daily-agent-help-grid">
+                <article>
+                  <code>get_today</code>
+                  <strong>查看今天</strong>
+                  <p>日历事件、Weekly / Notion 事项、Dashboard 指标和数据新鲜度。</p>
+                  <small>“今天有什么？” · “帮我排一下今天的优先级。”</small>
+                </article>
+                <article>
+                  <code>list_life_tasks</code>
+                  <strong>查看 Life Tasks</strong>
+                  <p>读取未完成、到期或全部生活事项。</p>
+                  <small>“这周有哪些生活事项？” · “把已完成的也列出来。”</small>
+                </article>
+                <article>
+                  <code>list_applications</code>
+                  <strong>检查求职进度</strong>
+                  <p>查看公司、职位、阶段、下一步、Follow-up 和 Deadline。</p>
+                  <small>“哪些申请该 follow up？” · “最近的 deadline 是什么？”</small>
+                </article>
+                <article>
+                  <code>get_neetcode_progress</code>
+                  <strong>查看刷题进度</strong>
+                  <p>读取完成统计、Topic 分布和最近 Attempts。</p>
+                  <small>“我最近刷题进度怎么样？” · “下一步练哪个 topic？”</small>
+                </article>
+                <article>
+                  <code>draft_life_task</code>
+                  <strong>起草 Life Task</strong>
+                  <p>一次最多起草三个；只生成待确认卡片，不会直接写入。</p>
+                  <small>“起草一个周三预约牙医的任务。”</small>
+                </article>
+              </div>
+              <div className="daily-agent-help-limits">
+                <span>BOUNDARIES</span>
+                <p>不能直接修改 Calendar、Notion、求职记录、NeetCode、文件系统；不能执行 Shell 或访问任意网络。读取可直接运行，写入只限确认后的 Life Task Draft。</p>
+              </div>
+            </section>
+          ) : view === "settings" ? (
             <form className="daily-agent-settings" onSubmit={(event) => void saveSettings(event)}>
               <div className="daily-agent-settings-intro">
                 <span>MODEL CONNECTION</span>
@@ -604,19 +820,95 @@ export function DailyAgent() {
                 <button type="button" onClick={() => void clearSavedKey()} disabled={settingsBusy || !settings.has_saved_api_key}>CLEAR SAVED KEY</button>
               </div>
             </form>
-          ) : <>
-          <div className="daily-agent-messages" aria-live="polite">
+          ) : (
+          <div className={`daily-agent-workspace${sessionsOpen ? " sessions-open" : ""}`}>
+            <button
+              className="daily-agent-session-scrim"
+              type="button"
+              aria-label="Close chat history"
+              aria-hidden={!sessionsOpen}
+              tabIndex={sessionsOpen ? 0 : -1}
+              onClick={() => setSessionsOpen(false)}
+            />
+            <nav className="daily-agent-sessions" aria-label="Daily Agent chats">
+              <div className="daily-agent-sessions-heading">
+                <div>
+                  <span>CONVERSATIONS</span>
+                  <small>{sessions.length} LOCAL</small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void addSession()}
+                  disabled={loading || sessionBusy}
+                >
+                  + SESSION
+                </button>
+              </div>
+              <div className="daily-agent-session-list">
+                {sessions.map((item, index) => (
+                  <button
+                    className={item.id === activeSessionId ? "active" : ""}
+                    type="button"
+                    aria-current={item.id === activeSessionId ? "page" : undefined}
+                    onClick={() => void switchSession(item.id)}
+                    disabled={loading || sessionBusy}
+                    key={item.id}
+                  >
+                    <span className="daily-agent-session-mark">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="daily-agent-session-meta">
+                      <b>{item.title}</b>
+                      <time dateTime={item.updated_at}>{traceTime(item.updated_at)}</time>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p>Each chat keeps its own messages and drafts.</p>
+            </nav>
+            <section className="daily-agent-conversation" aria-label={activeSession?.title ?? "Current chat"}>
+              <div className="daily-agent-conversation-bar">
+                <button
+                  className="daily-agent-drawer-toggle"
+                  type="button"
+                  aria-expanded={sessionsOpen}
+                  aria-label="Open chat history"
+                  onClick={() => setSessionsOpen(true)}
+                >
+                  CHATS
+                </button>
+                <div>
+                  <span>CURRENT SESSION</span>
+                  <strong>{activeSession?.title ?? (sessionBusy ? "Loading…" : "New chat")}</strong>
+                </div>
+                <div className="daily-agent-session-actions">
+                  <button type="button" onClick={() => setView("help")}>HELP</button>
+                  <button
+                    type="button"
+                    onClick={() => void editSessionTitle()}
+                    disabled={!activeSession || loading || sessionBusy}
+                  >
+                    RENAME
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeSession()}
+                    disabled={!activeSession || loading || sessionBusy}
+                  >
+                    DELETE
+                  </button>
+                </div>
+              </div>
+          <div className="daily-agent-messages" aria-live="polite" aria-busy={sessionBusy}>
             {!messages.length && !streamingText && (
               <div className="daily-agent-empty">
-                <span className="daily-agent-empty-mark">DA</span>
-                <strong>Ask against real Daily data.</strong>
-                <p>“今天有什么？”<br />“哪些申请该 follow up？”<br />“周三提醒我预约牙医。”</p>
-                <small>Reads run directly. Writes always wait for confirmation.</small>
+                <span className="daily-agent-empty-mark">&gt;_</span>
+                <strong>daily-agent ready</strong>
+                <p><span>$</span> 今天有什么？<br /><span>$</span> 哪些申请该 follow up？<br /><span>$</span> 周三提醒我预约牙医。</p>
+                <small>READS: DIRECT · WRITES: CONFIRMATION REQUIRED</small>
               </div>
             )}
             {messages.map((message) => (
               <article className={`daily-agent-message ${message.role}`} key={message.id}>
-                <span>{message.role === "user" ? "YOU" : "DAILY"}</span>
+                <span>{message.role === "user" ? "INPUT" : "OUTPUT"}</span>
                 <MessageContent content={message.content} />
                 {message.drafts.map((draft) => <DraftCard draft={draft} onResolve={updateDraft} key={draft.id} />)}
                 <MessageTrace createdAt={message.created_at} trace={message.role === "assistant" ? message.trace : null} />
@@ -624,15 +916,15 @@ export function DailyAgent() {
             ))}
             {(streamingText || loading) && (
               <article className="daily-agent-message assistant streaming">
-                <span>DAILY</span>
-                {activeTools.length ? <small>USING {activeTools.join(", ").toUpperCase()}…</small> : null}
-                {streamingText ? <MessageContent content={streamingText} /> : <i>Thinking…</i>}
+                <span>OUTPUT</span>
+                {activeTools.length ? <small>RUNNING {activeTools.join(", ").toUpperCase()}…</small> : null}
+                {streamingText ? <MessageContent content={streamingText} /> : <i>waiting for output_</i>}
                 {runStartedAt && (
                   <footer className="daily-agent-trace active">
                     <div className="daily-agent-trace-summary">
                       <time dateTime={runStartedAt}>{traceTime(runStartedAt)}</time>
                       <b>{traceDuration(runElapsedMs)}</b>
-                      <b>{activeTools.length ? `${activeTools.length} ACTIVE TOOLS` : "MODEL ACTIVE"}</b>
+                      <b>{activeTools.length ? `${activeTools.length} ACTIVE TOOLS` : "PROCESS ACTIVE"}</b>
                     </div>
                   </footer>
                 )}
@@ -652,21 +944,24 @@ export function DailyAgent() {
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder={status.configured ? "Ask Daily anything…" : "Open Settings to add an API key and model"}
+                placeholder={status.configured ? "Type a command or ask about your day…" : "Open Settings to add an API key and model"}
                 aria-label="Message Daily Agent"
-                disabled={!status.configured || loading}
+                disabled={!status.configured || loading || sessionBusy || activeSessionId === null}
                 rows={3}
               />
-              <small>ENTER TO SEND · SHIFT + ENTER FOR A NEW LINE</small>
+              <small>ENTER TO RUN · SHIFT + ENTER FOR A NEW LINE</small>
             </div>
             {loading ? (
               <button type="button" onClick={() => abortRef.current?.abort()}>STOP</button>
             ) : (
-              <button type="submit" disabled={!status.configured || !input.trim()}>SEND ↗</button>
+              <button type="submit" disabled={!status.configured || !input.trim() || sessionBusy || activeSessionId === null}>RUN ↗</button>
             )}
           </form>
-          </>}
-        </aside>
+            </section>
+          </div>
+          )}
+        </aside>,
+        document.body,
       )}
     </>
   );

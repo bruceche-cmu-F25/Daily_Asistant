@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Compatibility source adapters used by the canonical 8766 refresh.
+"""Compatibility implementations used by the concrete Source Adapters.
 
-The executable v1 HTML/8765 runtime has been retired.  Keep importing this
-module from ``refresh_dashboard.py`` until the source adapters are separated,
-but do not render or serve ``today.html`` again.
+The executable v1 HTML/8765 runtime is retired. Source-level globals remain
+private compatibility details behind ``source_adapters.py`` and must not be
+used by the Source Refresh orchestrator.
 """
 import csv
 import datetime as dt
@@ -23,8 +23,6 @@ from zoneinfo import ZoneInfo
 BIN_DIR = Path(__file__).resolve().parent
 if str(BIN_DIR) not in sys.path:
     sys.path.insert(0, str(BIN_DIR))
-from job_feed import collect_job_leads, load_candidate_profile
-
 BASE = Path(os.environ.get('DASHBOARD_HOME', Path(__file__).resolve().parent.parent))
 OUT = BASE / 'today.html'
 EVENT_DIR = BASE / 'event-plists'
@@ -74,6 +72,9 @@ TARGET_COPY_CN = '目标：26年12月毕业后，优先看 2027 New Grad 全职�
 
 def set_status(source, ok, detail):
     """Keep a short, safe status message for the generated page."""
+    previous = SOURCE_STATUS.get(source)
+    if previous and previous.get('ok') is False and ok:
+        return
     SOURCE_STATUS[source] = {'ok': bool(ok), 'detail': short(str(detail), 90)}
 
 

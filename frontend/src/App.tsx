@@ -229,6 +229,7 @@ export function App() {
             </div>
           )}
         </div>
+        <DailyAgent />
         <div className={`sync-button${dashboard.stale_sources.length ? " stale" : ""}`}>
           {dashboard.stale_sources.length ? "DEGRADED MODE" : "ALL SYSTEMS ONLINE"} · {clock}
         </div>
@@ -266,7 +267,6 @@ export function App() {
           {location.pathname !== "/" && location.pathname !== "/roadmap" && <footer>LOCAL-FIRST / CANONICAL RUNTIME / PORT 8766</footer>}
         </div>
       </div>
-      <DailyAgent />
     </div>
   );
 }

@@ -9,6 +9,7 @@ from daily_dashboard.api_daily_agent import get_session
 from daily_dashboard.database import make_engine
 from daily_dashboard.legacy_migration import upgrade_database
 from daily_dashboard.main import app
+from daily_dashboard.models import AgentDraft, AgentMessage, AgentSession
 
 
 def request(method, path, json_body=None):
@@ -18,6 +19,12 @@ def request(method, path, json_body=None):
             return await client.request(method, path, json=json_body)
 
     return anyio.run(run_request)
+
+
+def create_agent_session(title="New chat"):
+    response = request("POST", "/api/v1/daily-agent/sessions", {"title": title})
+    assert response.status_code == 201
+    return response.json()["session"]["id"]
 
 
 def test_daily_agent_drafts_before_approval_and_only_lands_once(tmp_path, monkeypatch):
@@ -76,16 +83,19 @@ def test_daily_agent_drafts_before_approval_and_only_lands_once(tmp_path, monkey
     monkeypatch.setenv("DAILY_AGENT_MODEL", "test-model")
     monkeypatch.setattr(api_daily_agent, "_call_model", fake_model)
     try:
+        session_id = create_agent_session()
         response = request(
             "POST",
             "/api/v1/daily-agent/chat/stream",
-            {"message": "周三早上九点半提醒我预约牙医"},
+            {"session_id": session_id, "message": "周三早上九点半提醒我预约牙医"},
         )
         assert response.status_code == 200
         assert "event: draft" in response.text
         assert "event: done" in response.text
 
-        history = request("GET", "/api/v1/daily-agent/history").json()["messages"]
+        history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        ).json()["messages"]
         assert [message["role"] for message in history] == ["user", "assistant"]
         draft = history[-1]["drafts"][0]
         trace = history[-1]["trace"]
@@ -124,7 +134,15 @@ def test_daily_agent_dismiss_and_clear_history(tmp_path):
     upgrade_database(database)
     engine = make_engine(database)
     with Session(engine) as session:
-        message = api_daily_agent.AgentMessage(
+        agent_session = AgentSession(
+            title="Draft chat",
+            created_at="2026-08-10T12:00:00-07:00",
+            updated_at="2026-08-10T12:00:00-07:00",
+        )
+        session.add(agent_session)
+        session.flush()
+        message = AgentMessage(
+            session_id=agent_session.id,
             role="assistant",
             content="Drafted",
             tool_calls_json="[]",
@@ -132,7 +150,7 @@ def test_daily_agent_dismiss_and_clear_history(tmp_path):
         )
         session.add(message)
         session.flush()
-        session.add(api_daily_agent.AgentDraft(
+        session.add(AgentDraft(
             message_id=message.id,
             kind="life_task",
             payload_json=json.dumps({
@@ -148,6 +166,7 @@ def test_daily_agent_dismiss_and_clear_history(tmp_path):
             resolved_at=None,
         ))
         session.commit()
+        session_id = agent_session.id
 
     def override_session():
         with Session(engine) as session:
@@ -155,16 +174,22 @@ def test_daily_agent_dismiss_and_clear_history(tmp_path):
 
     app.dependency_overrides[get_session] = override_session
     try:
-        history = request("GET", "/api/v1/daily-agent/history").json()["messages"]
+        history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        ).json()["messages"]
         draft_id = history[0]["drafts"][0]["id"]
         dismissed = request("POST", f"/api/v1/daily-agent/drafts/{draft_id}/dismiss")
         assert dismissed.status_code == 200
         assert dismissed.json()["draft"]["status"] == "dismissed"
         assert request("GET", "/api/v1/life-tasks").json()["items"] == []
 
-        cleared = request("DELETE", "/api/v1/daily-agent/history")
+        cleared = request(
+            "DELETE", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        )
         assert cleared.status_code == 204
-        assert request("GET", "/api/v1/daily-agent/history").json() == {"messages": []}
+        assert request(
+            "GET", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        ).json() == {"messages": []}
     finally:
         app.dependency_overrides.clear()
 
@@ -187,6 +212,7 @@ def test_daily_agent_requires_model_configuration(tmp_path, monkeypatch):
 
     app.dependency_overrides[get_session] = override_session
     try:
+        session_id = create_agent_session()
         status = request("GET", "/api/v1/daily-agent/status")
         assert status.status_code == 200
         assert status.json()["configured"] is False
@@ -194,7 +220,7 @@ def test_daily_agent_requires_model_configuration(tmp_path, monkeypatch):
         response = request(
             "POST",
             "/api/v1/daily-agent/chat/stream",
-            {"message": "What is on today?"},
+            {"session_id": session_id, "message": "What is on today?"},
         )
         assert response.status_code == 503
     finally:
@@ -387,14 +413,17 @@ def test_daily_agent_persists_failed_model_trace(tmp_path, monkeypatch):
     monkeypatch.setenv("DAILY_AGENT_MODEL", "test-model")
     monkeypatch.setattr(api_daily_agent, "_call_model", fake_model)
     try:
+        session_id = create_agent_session()
         response = request(
             "POST",
             "/api/v1/daily-agent/chat/stream",
-            {"message": "What is on today?"},
+            {"session_id": session_id, "message": "What is on today?"},
         )
         assert response.status_code == 200
         assert "event: error" in response.text
-        history = request("GET", "/api/v1/daily-agent/history").json()["messages"]
+        history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        ).json()["messages"]
         trace = history[-1]["trace"]
         assert trace["status"] == "failed"
         assert trace["error_type"] == "ValueError"
@@ -447,14 +476,163 @@ def test_daily_agent_caps_drafts_and_returns_a_result_for_every_tool_call(tmp_pa
     monkeypatch.setenv("DAILY_AGENT_MODEL", "test-model")
     monkeypatch.setattr(api_daily_agent, "_call_model", fake_model)
     try:
+        session_id = create_agent_session()
         response = request(
             "POST",
             "/api/v1/daily-agent/chat/stream",
-            {"message": "Add four things"},
+            {"session_id": session_id, "message": "Add four things"},
         )
         assert response.status_code == 200
-        history = request("GET", "/api/v1/daily-agent/history").json()["messages"]
+        history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        ).json()["messages"]
         assert len(history[-1]["drafts"]) == 3
+        assert request("GET", "/api/v1/life-tasks").json()["items"] == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_daily_agent_sessions_are_isolated_and_support_lifecycle(tmp_path, monkeypatch):
+    database = tmp_path / "daily_v2.db"
+    upgrade_database(database)
+
+    def override_session():
+        with Session(make_engine(database)) as session:
+            yield session
+
+    async def fake_model(_settings, messages):
+        latest = next(message["content"] for message in reversed(messages) if message["role"] == "user")
+        return {"role": "assistant", "content": f"Reply to {latest}"}
+
+    app.dependency_overrides[get_session] = override_session
+    monkeypatch.setenv("DAILY_AGENT_API_KEY", "test-key")
+    monkeypatch.setenv("DAILY_AGENT_MODEL", "test-model")
+    monkeypatch.setattr(api_daily_agent, "_call_model", fake_model)
+    try:
+        assert request("GET", "/api/v1/daily-agent/sessions").json()["sessions"] == []
+
+        first_id = create_agent_session()
+        second_id = create_agent_session()
+        first_turn = request(
+            "POST",
+            "/api/v1/daily-agent/chat/stream",
+            {"session_id": first_id, "message": "Plan the dentist visit"},
+        )
+        second_turn = request(
+            "POST",
+            "/api/v1/daily-agent/chat/stream",
+            {"session_id": second_id, "message": "Review my applications"},
+        )
+        assert first_turn.status_code == second_turn.status_code == 200
+
+        first_history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{first_id}/history"
+        ).json()["messages"]
+        second_history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{second_id}/history"
+        ).json()["messages"]
+        assert [item["content"] for item in first_history] == [
+            "Plan the dentist visit",
+            "Reply to Plan the dentist visit",
+        ]
+        assert [item["content"] for item in second_history] == [
+            "Review my applications",
+            "Reply to Review my applications",
+        ]
+        assert {item["session_id"] for item in first_history} == {first_id}
+        assert {item["session_id"] for item in second_history} == {second_id}
+
+        sessions = request("GET", "/api/v1/daily-agent/sessions").json()["sessions"]
+        by_id = {item["id"]: item for item in sessions}
+        assert by_id[first_id]["title"] == "Plan the dentist visit"
+        assert by_id[second_id]["title"] == "Review my applications"
+
+        renamed = request(
+            "PATCH",
+            f"/api/v1/daily-agent/sessions/{second_id}",
+            {"title": "Job search"},
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["session"]["title"] == "Job search"
+
+        cleared = request(
+            "DELETE", f"/api/v1/daily-agent/sessions/{first_id}/history"
+        )
+        assert cleared.status_code == 204
+        assert request(
+            "GET", f"/api/v1/daily-agent/sessions/{first_id}/history"
+        ).json() == {"messages": []}
+        assert len(request(
+            "GET", f"/api/v1/daily-agent/sessions/{second_id}/history"
+        ).json()["messages"]) == 2
+
+        deleted = request("DELETE", f"/api/v1/daily-agent/sessions/{first_id}")
+        assert deleted.status_code == 204
+        assert request(
+            "GET", f"/api/v1/daily-agent/sessions/{first_id}/history"
+        ).status_code == 404
+        assert request(
+            "GET", f"/api/v1/daily-agent/sessions/{second_id}/history"
+        ).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_failed_agent_turn_preserves_pending_draft_in_its_session(tmp_path, monkeypatch):
+    database = tmp_path / "daily_v2.db"
+    upgrade_database(database)
+
+    def override_session():
+        with Session(make_engine(database)) as session:
+            yield session
+
+    calls = 0
+
+    async def fake_model(_settings, _messages):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": "draft-before-failure",
+                    "type": "function",
+                    "function": {
+                        "name": "draft_life_task",
+                        "arguments": json.dumps({
+                            "title": "Keep this draft",
+                            "category": "personal",
+                            "due_at": None,
+                            "notes": "",
+                        }),
+                    },
+                }],
+            }
+        raise ValueError("later model round failed")
+
+    app.dependency_overrides[get_session] = override_session
+    monkeypatch.setenv("DAILY_AGENT_API_KEY", "test-key")
+    monkeypatch.setenv("DAILY_AGENT_MODEL", "test-model")
+    monkeypatch.setattr(api_daily_agent, "_call_model", fake_model)
+    try:
+        session_id = create_agent_session()
+        response = request(
+            "POST",
+            "/api/v1/daily-agent/chat/stream",
+            {"session_id": session_id, "message": "Draft this even if the reply fails"},
+        )
+        assert response.status_code == 200
+        assert "event: draft" in response.text
+        assert "event: error" in response.text
+
+        history = request(
+            "GET", f"/api/v1/daily-agent/sessions/{session_id}/history"
+        ).json()["messages"]
+        assistant = history[-1]
+        assert assistant["trace"]["status"] == "failed"
+        assert assistant["drafts"][0]["summary"] == "Keep this draft"
+        assert assistant["drafts"][0]["status"] == "pending"
         assert request("GET", "/api/v1/life-tasks").json()["items"] == []
     finally:
         app.dependency_overrides.clear()

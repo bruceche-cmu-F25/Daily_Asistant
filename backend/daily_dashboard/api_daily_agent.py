@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
@@ -12,41 +11,52 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import delete, select
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from .api_life_tasks import LifeTaskCreate, task_dict
+from .agent_sessions import (
+    clear_session_history,
+    conversation_history,
+    create_session,
+    delete_session,
+    draft_dict,
+    list_sessions,
+    message_dict,
+    rename_session,
+    session_dict,
+    touch_session,
+)
 from .infra import get_session, now_iso
-from .models import AgentConfiguration, AgentDraft, AgentMessage, JobApplication, LifeTask
-from .repository import neetcode_snapshot
-from .snapshot import load_dashboard_snapshot
+from .life_tasks import LifeTaskCreate, create_task, task_dict
+from .agent_turns import (
+    ModelResponse,
+    normalize_usage as _normalize_usage,
+    run_agent_turn,
+    tool_definitions as _tools,
+)
+from .models import AgentConfiguration, AgentDraft, AgentSession
 
 
 router = APIRouter(prefix="/api/v1/daily-agent", tags=["daily-agent"])
-MAX_HISTORY = 20
-MAX_TOOL_ROUNDS = 4
-
-
-SYSTEM_PROMPT = """你是 Daily OS 里的 Daily Agent，服务于一个用户。
-
-你负责帮助用户看清今天、生活事项、求职进度和刷题进度。中文为主，简短、直接，不做空泛鼓励。
-凡是涉及当前数据的回答，必须先调用相应读取工具；不要把之前对话里的说法当作数据库事实。
-
-安全边界：
-- 读取工具可以直接运行。
-- 你不能修改 Calendar、Notion、Dashboard Snapshot、求职记录、刷题记录或文件系统。
-- 新建生活事项只能调用 draft_life_task。它只会生成待审批卡片，绝不会直接写入 Life。
-- 调用 draft_life_task 后必须明确说“已起草，确认后才会写入”，不能说“已经添加/安排好了”。
-- 不要声称拥有未注册的工具，不执行 shell，不访问任意文件或网络。
-
-日期和时间必须使用 YYYY-MM-DD 或 YYYY-MM-DDTHH:MM。一次最多起草三个生活事项。"""
 
 
 class AgentChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    session_id: int = Field(gt=0)
     message: str = Field(min_length=1, max_length=2_000)
+
+
+class AgentSessionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(default="New chat", max_length=120)
+
+
+class AgentSessionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=120)
 
 
 class AgentSettingsUpdate(BaseModel):
@@ -77,12 +87,6 @@ class AgentSettings:
     @property
     def configured(self) -> bool:
         return bool(self.api_key and self.model)
-
-
-@dataclass(frozen=True)
-class ModelResponse:
-    message: dict[str, Any]
-    usage: dict[str, int | None]
 
 
 def _clean_base_url(value: str) -> str:
@@ -137,198 +141,6 @@ def settings_dict(settings: AgentSettings) -> dict[str, Any]:
     }
 
 
-def draft_dict(draft: AgentDraft) -> dict[str, Any]:
-    return {
-        "id": draft.id,
-        "message_id": draft.message_id,
-        "kind": draft.kind,
-        "payload": json.loads(draft.payload_json),
-        "summary": draft.summary,
-        "status": draft.status,
-        "created_at": draft.created_at,
-        "resolved_at": draft.resolved_at,
-    }
-
-
-def message_dict(message: AgentMessage, drafts: list[AgentDraft] | None = None) -> dict[str, Any]:
-    trace = json.loads(message.trace_json or "{}")
-    return {
-        "id": message.id,
-        "role": message.role,
-        "content": message.content,
-        "tool_calls": json.loads(message.tool_calls_json),
-        "trace": trace or None,
-        "created_at": message.created_at,
-        "drafts": [draft_dict(draft) for draft in (drafts or [])],
-    }
-
-
-def conversation_history(session: Session) -> list[dict[str, Any]]:
-    messages = session.scalars(select(AgentMessage).order_by(AgentMessage.id.asc())).all()
-    drafts = session.scalars(select(AgentDraft).order_by(AgentDraft.id.asc())).all()
-    by_message: dict[int, list[AgentDraft]] = {}
-    for draft in drafts:
-        by_message.setdefault(draft.message_id, []).append(draft)
-    return [message_dict(message, by_message.get(message.id, [])) for message in messages]
-
-
-def _tools() -> list[dict[str, Any]]:
-    category = ["personal", "home", "health", "finance", "errands", "social", "admin", "other"]
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_today",
-                "description": "Read today's Dashboard snapshot: date, events, Notion/weekly tasks, freshness and metrics.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "list_life_tasks",
-                "description": "List current local Life tasks, ordered with open and due items first.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "include_completed": {
-                            "type": "boolean",
-                            "description": "Include completed Life tasks. Defaults to false.",
-                        }
-                    },
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "list_applications",
-                "description": "List job applications with stage, next step, follow-up and deadline.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "get_neetcode_progress",
-                "description": "Read NeetCode progress summary and recent attempts.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "draft_life_task",
-                "description": "Draft one local Life task. This does not create it; the user must approve the card.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string", "description": "Concrete task title."},
-                        "category": {"type": "string", "enum": category},
-                        "due_at": {
-                            "type": ["string", "null"],
-                            "description": "YYYY-MM-DD or YYYY-MM-DDTHH:MM, or null for someday.",
-                        },
-                        "notes": {"type": "string"},
-                    },
-                    "required": ["title", "category", "due_at", "notes"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-    ]
-
-
-def _application_summary(application: JobApplication) -> dict[str, Any]:
-    return {
-        "id": application.id,
-        "company": application.company,
-        "role": application.role,
-        "stage": application.stage,
-        "next_step": application.next_step,
-        "follow_up_at": application.follow_up_at,
-        "deadline_at": application.deadline_at,
-        "contact_status": application.contact_status,
-    }
-
-
-def _execute_tool(
-    name: str,
-    arguments: dict[str, Any],
-    session: Session,
-    assistant_id: int,
-) -> tuple[str, AgentDraft | None]:
-    if name == "get_today":
-        snapshot = load_dashboard_snapshot()
-        result = {
-            "date": snapshot.get("date"),
-            "generated_at": snapshot.get("generated_at"),
-            "stale_sources": snapshot.get("stale_sources", []),
-            "metrics": snapshot.get("metrics", {}),
-            "events": snapshot.get("events", [])[:30],
-            "weekly": snapshot.get("weekly", [])[:30],
-            "notion": snapshot.get("notion", [])[:30],
-        }
-        return json.dumps(result, ensure_ascii=False), None
-
-    if name == "list_life_tasks":
-        query = select(LifeTask).order_by(
-            LifeTask.completed.asc(),
-            LifeTask.due_at.is_(None),
-            LifeTask.due_at.asc(),
-            LifeTask.id.desc(),
-        )
-        if not bool(arguments.get("include_completed", False)):
-            query = query.where(LifeTask.completed == 0)
-        tasks = session.scalars(query.limit(40)).all()
-        return json.dumps([task_dict(task) for task in tasks], ensure_ascii=False), None
-
-    if name == "list_applications":
-        applications = session.scalars(
-            select(JobApplication).order_by(
-                JobApplication.follow_up_at.is_(None),
-                JobApplication.follow_up_at.asc(),
-                JobApplication.id.desc(),
-            ).limit(40)
-        ).all()
-        return json.dumps(
-            [_application_summary(application) for application in applications],
-            ensure_ascii=False,
-        ), None
-
-    if name == "get_neetcode_progress":
-        progress = neetcode_snapshot()
-        result = {
-            "summary": progress.get("summary", {}),
-            "topics": progress.get("topics", []),
-            "recent_attempts": progress.get("attempts", [])[-12:],
-        }
-        return json.dumps(result, ensure_ascii=False), None
-
-    if name == "draft_life_task":
-        try:
-            payload = LifeTaskCreate.model_validate(arguments).model_dump()
-        except ValidationError as error:
-            return f"Draft rejected by validation: {error.errors(include_url=False)}", None
-        draft = AgentDraft(
-            message_id=assistant_id,
-            kind="life_task",
-            payload_json=json.dumps(payload, ensure_ascii=False, sort_keys=True),
-            summary=payload["title"],
-            status="pending",
-            created_at=now_iso(),
-            resolved_at=None,
-        )
-        session.add(draft)
-        session.commit()
-        session.refresh(draft)
-        return (
-            f"Draft #{draft.id} created. It is NOT in Life yet and requires explicit approval.",
-            draft,
-        )
-
-    return f"Unknown tool: {name}", None
 
 
 def _model_request_body(
@@ -347,71 +159,6 @@ def _model_request_body(
     return request_body
 
 
-def _usage_int(usage: dict[str, Any], *paths: tuple[str, ...]) -> int | None:
-    for path in paths:
-        value: Any = usage
-        for key in path:
-            if not isinstance(value, dict):
-                value = None
-                break
-            value = value.get(key)
-        if isinstance(value, int) and not isinstance(value, bool):
-            return value
-    return None
-
-
-def _normalize_usage(raw_usage: Any) -> dict[str, int | None]:
-    usage = raw_usage if isinstance(raw_usage, dict) else {}
-    prompt_tokens = _usage_int(usage, ("prompt_tokens",), ("input_tokens",))
-    completion_tokens = _usage_int(usage, ("completion_tokens",), ("output_tokens",))
-    total_tokens = _usage_int(usage, ("total_tokens",))
-    if total_tokens is None and prompt_tokens is not None and completion_tokens is not None:
-        total_tokens = prompt_tokens + completion_tokens
-    return {
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens": total_tokens,
-        "cached_tokens": _usage_int(
-            usage,
-            ("prompt_tokens_details", "cached_tokens"),
-            ("input_tokens_details", "cached_tokens"),
-            ("cache_read_input_tokens",),
-        ),
-    }
-
-
-def _sum_round_usage(rounds: list[dict[str, Any]], key: str) -> int | None:
-    values = [item[key] for item in rounds if isinstance(item.get(key), int)]
-    return sum(values) if values else None
-
-
-def _trace_payload(
-    *,
-    settings: AgentSettings,
-    status: str,
-    started_at: str,
-    started_timer: float,
-    rounds: list[dict[str, Any]],
-    tool_calls: int,
-    error_type: str | None = None,
-) -> dict[str, Any]:
-    trace: dict[str, Any] = {
-        "status": status,
-        "model": settings.model,
-        "started_at": started_at,
-        "completed_at": now_iso(),
-        "duration_ms": max(0, round((time.perf_counter() - started_timer) * 1_000)),
-        "model_calls": len(rounds),
-        "prompt_tokens": _sum_round_usage(rounds, "prompt_tokens"),
-        "completion_tokens": _sum_round_usage(rounds, "completion_tokens"),
-        "total_tokens": _sum_round_usage(rounds, "total_tokens"),
-        "cached_tokens": _sum_round_usage(rounds, "cached_tokens"),
-        "tool_calls": tool_calls,
-        "rounds": rounds,
-    }
-    if error_type:
-        trace["error_type"] = error_type
-    return trace
 
 
 async def _call_model(settings: AgentSettings, messages: list[dict[str, Any]]) -> ModelResponse:
@@ -475,13 +222,6 @@ def _connection_error(error: Exception) -> str:
     return "The provider returned an incompatible response."
 
 
-def _content_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        parts = [part.get("text", "") for part in content if isinstance(part, dict)]
-        return "".join(parts).strip()
-    return ""
 
 
 def _sse(event: str, payload: dict[str, Any]) -> str:
@@ -493,183 +233,14 @@ async def _run_turn(
     session: Session,
     settings: AgentSettings,
 ) -> AsyncIterator[str]:
-    prior = session.scalars(
-        select(AgentMessage).order_by(AgentMessage.id.desc()).limit(MAX_HISTORY)
-    ).all()
-    prior.reverse()
-    user = AgentMessage(
-        role="user",
-        content=request.message.strip(),
-        tool_calls_json="[]",
-        trace_json="{}",
-        created_at=now_iso(),
-    )
-    trace_started_at = now_iso()
-    trace_started_timer = time.perf_counter()
-    assistant = AgentMessage(
-        role="assistant",
-        content="",
-        tool_calls_json="[]",
-        trace_json="{}",
-        created_at=trace_started_at,
-    )
-    session.add_all([user, assistant])
-    session.commit()
-    session.refresh(user)
-    session.refresh(assistant)
-
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(
-        {"role": item.role, "content": item.content}
-        for item in prior
-        if item.content.strip()
-    )
-    messages.append({"role": "user", "content": user.content})
-    used: list[dict[str, Any]] = []
-    made: list[AgentDraft] = []
-    trace_rounds: list[dict[str, Any]] = []
-    reply = ""
-    yield _sse("started", {"model": settings.model, "started_at": trace_started_at})
-
-    try:
-        for round_index in range(1, MAX_TOOL_ROUNDS + 1):
-            round_started_at = now_iso()
-            round_started_timer = time.perf_counter()
-            try:
-                raw_response = await _call_model(settings, messages)
-            except (httpx.HTTPError, ValueError):
-                trace_rounds.append(
-                    {
-                        "round": round_index,
-                        "status": "failed",
-                        "started_at": round_started_at,
-                        "completed_at": now_iso(),
-                        "duration_ms": max(
-                            0, round((time.perf_counter() - round_started_timer) * 1_000)
-                        ),
-                        **_normalize_usage(None),
-                        "tools": [],
-                    }
-                )
-                raise
-            if isinstance(raw_response, ModelResponse):
-                model_message = raw_response.message
-                usage = raw_response.usage
-            else:
-                # Keeps local test doubles and older integrations compatible.
-                model_message = raw_response
-                usage = _normalize_usage(None)
-            tool_calls = model_message.get("tool_calls") or []
-            names = [
-                str(call.get("function", {}).get("name", "unknown")) for call in tool_calls
-            ]
-            trace_rounds.append(
-                {
-                    "round": round_index,
-                    "status": "completed",
-                    "started_at": round_started_at,
-                    "completed_at": now_iso(),
-                    "duration_ms": max(
-                        0, round((time.perf_counter() - round_started_timer) * 1_000)
-                    ),
-                    **usage,
-                    "tools": names,
-                }
-            )
-            text = _content_text(model_message.get("content"))
-            if not tool_calls:
-                reply = text
-                break
-
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": model_message.get("content"),
-                    "tool_calls": tool_calls,
-                }
-            )
-            yield _sse("tools", {"names": names})
-            for index, call in enumerate(tool_calls):
-                function = call.get("function", {})
-                name = str(function.get("name", ""))
-                if index >= 3:
-                    result, draft, arguments = (
-                        "Tool batch limit exceeded; this call was not run.",
-                        None,
-                        {},
-                    )
-                elif name == "draft_life_task" and len(made) >= 3:
-                    result, draft, arguments = (
-                        "Draft limit reached; this call was not run.",
-                        None,
-                        {},
-                    )
-                else:
-                    try:
-                        arguments = json.loads(function.get("arguments") or "{}")
-                        if not isinstance(arguments, dict):
-                            raise ValueError("arguments must be an object")
-                    except (json.JSONDecodeError, ValueError) as error:
-                        result, draft = f"Invalid tool arguments: {error}", None
-                        arguments = {}
-                    else:
-                        result, draft = _execute_tool(name, arguments, session, assistant.id)
-                used.append({"name": name, "arguments": arguments, "result": result[:1_500]})
-                if draft is not None:
-                    made.append(draft)
-                    yield _sse("draft", {"draft": draft_dict(draft)})
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": str(call.get("id", "")),
-                        "content": result,
-                    }
-                )
-            yield _sse("tools", {"names": []})
-        else:
-            reply = "我为这次操作调用了太多工具，已安全停止；没有未经确认的写入。"
-    except (httpx.HTTPError, ValueError) as error:
-        reply = f"Daily Agent 暂时无法完成这次请求：{error.__class__.__name__}。"
-        assistant.content = reply
-        assistant.tool_calls_json = json.dumps(used, ensure_ascii=False)
-        assistant.trace_json = json.dumps(
-            _trace_payload(
-                settings=settings,
-                status="failed",
-                started_at=trace_started_at,
-                started_timer=trace_started_timer,
-                rounds=trace_rounds,
-                tool_calls=len(used),
-                error_type=error.__class__.__name__,
-            ),
-            ensure_ascii=False,
-        )
-        session.commit()
-        yield _sse("error", {"error": reply})
-        return
-
-    if not reply:
-        reply = "已起草，确认卡片后才会写入 Life。" if made else "这次没有得到可用结果，请换一种说法。"
-    assistant.content = reply
-    assistant.tool_calls_json = json.dumps(used, ensure_ascii=False)
-    assistant.trace_json = json.dumps(
-        _trace_payload(
-            settings=settings,
-            status="completed",
-            started_at=trace_started_at,
-            started_timer=trace_started_timer,
-            rounds=trace_rounds,
-            tool_calls=len(used),
-        ),
-        ensure_ascii=False,
-    )
-    session.commit()
-    session.refresh(assistant)
-    current_drafts = session.scalars(
-        select(AgentDraft).where(AgentDraft.message_id == assistant.id).order_by(AgentDraft.id)
-    ).all()
-    yield _sse("text", {"text": reply})
-    yield _sse("done", {"message": message_dict(assistant, current_drafts)})
+    async for event in run_agent_turn(
+        session=session,
+        session_id=request.session_id,
+        message=request.message,
+        settings=settings,
+        call_model=_call_model,
+    ):
+        yield _sse(event.type, event.payload)
 
 
 @router.get("/settings")
@@ -750,15 +321,68 @@ def daily_agent_status(
     }
 
 
-@router.get("/history")
-def daily_agent_history(session: Session = Depends(get_session)) -> dict[str, Any]:
-    return {"messages": conversation_history(session)}
+@router.get("/sessions")
+def daily_agent_sessions(session: Session = Depends(get_session)) -> dict[str, Any]:
+    return {"sessions": [session_dict(item) for item in list_sessions(session)]}
 
 
-@router.delete("/history", status_code=204)
-def clear_daily_agent_history(session: Session = Depends(get_session)) -> None:
-    session.execute(delete(AgentDraft))
-    session.execute(delete(AgentMessage))
+@router.post("/sessions", status_code=201)
+def create_daily_agent_session(
+    request: AgentSessionCreate,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    agent_session = create_session(session, title=request.title, now=now_iso())
+    session.commit()
+    session.refresh(agent_session)
+    return {"session": session_dict(agent_session)}
+
+
+@router.patch("/sessions/{session_id}")
+def rename_daily_agent_session(
+    session_id: int,
+    request: AgentSessionUpdate,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    agent_session = session.get(AgentSession, session_id)
+    if agent_session is None:
+        raise HTTPException(status_code=404, detail="Agent Session not found")
+    rename_session(agent_session, title=request.title, now=now_iso())
+    session.commit()
+    return {"session": session_dict(agent_session)}
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_daily_agent_session(
+    session_id: int,
+    session: Session = Depends(get_session),
+) -> None:
+    agent_session = session.get(AgentSession, session_id)
+    if agent_session is None:
+        raise HTTPException(status_code=404, detail="Agent Session not found")
+    delete_session(session, agent_session)
+    session.commit()
+
+
+@router.get("/sessions/{session_id}/history")
+def daily_agent_history(
+    session_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    if session.get(AgentSession, session_id) is None:
+        raise HTTPException(status_code=404, detail="Agent Session not found")
+    return {"messages": conversation_history(session, session_id)}
+
+
+@router.delete("/sessions/{session_id}/history", status_code=204)
+def clear_daily_agent_history(
+    session_id: int,
+    session: Session = Depends(get_session),
+) -> None:
+    agent_session = session.get(AgentSession, session_id)
+    if agent_session is None:
+        raise HTTPException(status_code=404, detail="Agent Session not found")
+    clear_session_history(session, session_id)
+    agent_session.updated_at = now_iso()
     session.commit()
 
 
@@ -767,6 +391,8 @@ def daily_agent_chat(
     request: AgentChatRequest,
     session: Session = Depends(get_session),
 ) -> StreamingResponse:
+    if session.get(AgentSession, request.session_id) is None:
+        raise HTTPException(status_code=404, detail="Agent Session not found")
     settings = agent_settings(session)
     if not settings.configured:
         raise HTTPException(
@@ -793,17 +419,12 @@ def approve_daily_agent_draft(
     if draft.kind != "life_task":
         raise HTTPException(status_code=400, detail="Unsupported draft kind")
 
-    payload = LifeTaskCreate.model_validate(json.loads(draft.payload_json)).model_dump()
-    completed = bool(payload.pop("completed"))
     timestamp = now_iso()
-    task = LifeTask(
-        **payload,
-        completed=int(completed),
-        completed_at=timestamp if completed else None,
-        created_at=timestamp,
-        updated_at=timestamp,
+    task = create_task(
+        session,
+        LifeTaskCreate.model_validate(json.loads(draft.payload_json)),
+        now=timestamp,
     )
-    session.add(task)
     draft.status = "approved"
     draft.resolved_at = timestamp
     session.commit()

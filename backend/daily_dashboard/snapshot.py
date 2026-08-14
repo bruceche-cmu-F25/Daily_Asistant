@@ -63,7 +63,7 @@ class DashboardSnapshot(BaseModel):
 
 SOURCE_FIELDS: dict[str, tuple[str, ...]] = {
     "Calendar": ("events",),
-    "Notion": ("links", "weekly", "notion", "weekly_plan"),
+    "Notion": ("links", "weekly", "notion", "weekly_plan", "job_groups", "quick_actions"),
     "Brave Search": ("jobs", "news", "discover_events"),
     "Job Feeds": ("job_leads", "candidate_profile", "job_feed_refreshed_at"),
 }

@@ -13,8 +13,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_applications import application_dict
-from .application_intake import capture_from_lead
+from .application_intake import application_dict, capture_from_lead
 from .infra import get_session, now_iso
 from .legacy import PROJECT_ROOT
 from .models import JobLeadDecision

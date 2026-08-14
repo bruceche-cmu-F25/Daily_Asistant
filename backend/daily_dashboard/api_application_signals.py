@@ -9,8 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_applications import application_dict
-from .application_intake import IntakeError, advance_from_signal
+from .application_intake import IntakeError, advance_from_signal, application_dict
 from .infra import get_session, now_iso
 from .application_signal_service import import_email_signals
 from .application_signals import EmailEnvelope

@@ -259,6 +259,13 @@ export type DailyAgentDraft = {
   resolved_at: string | null;
 };
 
+export type DailyAgentSession = {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DailyAgentTraceRound = {
   round: number;
   status: "completed" | "failed";
@@ -290,6 +297,7 @@ export type DailyAgentTrace = {
 
 export type DailyAgentMessage = {
   id: number;
+  session_id: number;
   role: "user" | "assistant";
   content: string;
   tool_calls: Array<{ name: string; arguments: Record<string, unknown>; result: string }>;

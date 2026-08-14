@@ -171,6 +171,18 @@ class ApplicationSignal(Base):
     updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
 
 
+class AgentSession(Base):
+    """One isolated native Daily Agent conversation."""
+
+    __tablename__ = "agent_sessions"
+    __table_args__ = (Index("ix_agent_session_updated", "updated_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False, default="New chat")
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
 class AgentMessage(Base):
     """One locally persisted turn in the native Daily Agent conversation."""
 
@@ -181,6 +193,9 @@ class AgentMessage(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False
+    )
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     tool_calls_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")

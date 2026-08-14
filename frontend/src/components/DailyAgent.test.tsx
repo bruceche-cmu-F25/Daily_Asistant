@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createDailyAgentSession, loadDailyAgentHistory } from "../api";
 import { DailyAgent } from "./DailyAgent";
 
 
@@ -10,8 +11,30 @@ vi.mock("../api", () => ({
     model: "gemini-2.5-flash",
     detail: "Ready · gemini-2.5-flash",
   }),
-  loadDailyAgentHistory: () => Promise.resolve([{
+  loadDailyAgentSessions: () => Promise.resolve([
+    { id: 1, title: "Today planning", created_at: "2026-08-10T12:00:00-07:00", updated_at: "2026-08-10T12:00:01-07:00" },
+    { id: 2, title: "Job search", created_at: "2026-08-09T12:00:00-07:00", updated_at: "2026-08-09T12:00:01-07:00" },
+  ]),
+  createDailyAgentSession: vi.fn(() => Promise.resolve({
+    id: 3,
+    title: "New chat",
+    created_at: "2026-08-10T13:00:00-07:00",
+    updated_at: "2026-08-10T13:00:00-07:00",
+  })),
+  renameDailyAgentSession: vi.fn(),
+  deleteDailyAgentSession: vi.fn(),
+  loadDailyAgentHistory: vi.fn((sessionId: number) => Promise.resolve(sessionId === 2 ? [{
+    id: 2,
+    session_id: 2,
+    role: "assistant",
+    content: "只属于求职聊天。",
+    tool_calls: [],
+    created_at: "2026-08-09T12:00:00-07:00",
+    drafts: [],
+    trace: null,
+  }] : sessionId === 3 ? [] : [{
     id: 1,
+    session_id: 1,
     role: "assistant",
     content: "今天有一个重点任务。",
     tool_calls: [],
@@ -42,7 +65,7 @@ vi.mock("../api", () => ({
         tools: ["get_today"],
       }],
     },
-  }]),
+  }])),
   loadDailyAgentSettings: () => Promise.resolve({
     base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
     model: "gemini-2.5-flash",
@@ -75,5 +98,21 @@ describe("Daily Agent trace", () => {
     expect(screen.getByText("ROUND 1")).toBeInTheDocument();
     expect(screen.getByText("IN 1,000")).toBeInTheDocument();
     expect(screen.getByText("TOOLS · get_today")).toBeInTheDocument();
+  });
+
+  it("switches isolated chats and creates a new session", async () => {
+    render(<DailyAgent />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Daily Agent" }));
+
+    expect(await screen.findByText("今天有一个重点任务。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Job search/ }));
+    expect(await screen.findByText("只属于求职聊天。")).toBeInTheDocument();
+    expect(screen.queryByText("今天有一个重点任务。")).not.toBeInTheDocument();
+    expect(vi.mocked(loadDailyAgentHistory)).toHaveBeenCalledWith(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "+ SESSION" }));
+    expect(await screen.findByText("daily-agent ready")).toBeInTheDocument();
+    expect(vi.mocked(createDailyAgentSession)).toHaveBeenCalled();
+    expect(screen.getByLabelText("Message Daily Agent")).toBeEnabled();
   });
 });

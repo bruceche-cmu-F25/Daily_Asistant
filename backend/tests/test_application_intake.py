@@ -13,10 +13,14 @@ import pytest
 from sqlalchemy.orm import Session
 
 from daily_dashboard.application_intake import (
+    ApplicationCreate,
+    ApplicationUpdate,
     IntakeError,
     advance_from_signal,
     capture_from_lead,
+    create_manual,
     stage_advances,
+    update_manual,
 )
 from daily_dashboard.database import make_engine
 from daily_dashboard.legacy_migration import upgrade_database
@@ -73,6 +77,61 @@ def test_stage_advances_is_monotonic_with_terminal_override():
     assert stage_advances("interview", "applied") is False
     assert stage_advances("interview", "rejected") is True
     assert stage_advances("offer", "withdrawn") is True
+
+
+def test_manual_intake_owns_birth_defaults(session):
+    application = create_manual(
+        session,
+        ApplicationCreate(company="  Example Labs  ", role="  Software Engineer  "),
+        now=NOW,
+    )
+
+    assert application.company == "Example Labs"
+    assert application.role == "Software Engineer"
+    assert application.stage == "saved"
+    assert application.contact_type == "none"
+    assert application.contact_status == "not_contacted"
+    assert application.created_at == NOW
+    assert application.updated_at == NOW
+
+
+def test_manual_intake_updates_fields_and_advances_stage(session):
+    application = make_application(session, stage="applied", next_step="Wait")
+
+    result = update_manual(
+        application,
+        ApplicationUpdate(stage="oa", next_step="Finish assessment"),
+        now="2026-07-18T10:00:00-07:00",
+    )
+
+    assert result.stage == "oa"
+    assert result.next_step == "Finish assessment"
+    assert result.updated_at == "2026-07-18T10:00:00-07:00"
+
+
+def test_manual_intake_rejects_regression_without_partial_changes(session):
+    application = make_application(
+        session,
+        stage="interview",
+        next_step="Prepare system design",
+        contact_status="planned",
+    )
+
+    with pytest.raises(IntakeError, match="cannot regress from interview to applied"):
+        update_manual(
+            application,
+            ApplicationUpdate(
+                stage="applied",
+                next_step="Wait for response",
+                contact_status="contacted",
+            ),
+            now="2026-07-18T10:00:00-07:00",
+        )
+
+    assert application.stage == "interview"
+    assert application.next_step == "Prepare system design"
+    assert application.contact_status == "planned"
+    assert application.updated_at == NOW
 
 
 def test_advance_from_signal_creates_minimal_application_when_unlinked(session):

@@ -39,6 +39,25 @@ vi.mock("./api", () => ({
     model: "test-model",
     detail: "Ready · test-model",
   }),
+  loadDailyAgentSessions: () => Promise.resolve([{
+    id: 1,
+    title: "New chat",
+    created_at: "2026-07-15T09:00:00-07:00",
+    updated_at: "2026-07-15T09:00:00-07:00",
+  }]),
+  createDailyAgentSession: () => Promise.resolve({
+    id: 2,
+    title: "New chat",
+    created_at: "2026-07-15T09:00:00-07:00",
+    updated_at: "2026-07-15T09:00:00-07:00",
+  }),
+  renameDailyAgentSession: (_id: number, title: string) => Promise.resolve({
+    id: 1,
+    title,
+    created_at: "2026-07-15T09:00:00-07:00",
+    updated_at: "2026-07-15T09:00:00-07:00",
+  }),
+  deleteDailyAgentSession: () => Promise.resolve(),
   loadDailyAgentHistory: () => Promise.resolve([]),
   loadDailyAgentSettings: () => Promise.resolve({
     base_url: "https://api.openai.com/v1",
@@ -269,16 +288,27 @@ describe("App", () => {
 
     const launcher = screen.getByRole("button", { name: "Open Daily Agent" });
     expect(launcher).toHaveAttribute("aria-expanded", "false");
+    expect(launcher.closest(".topbar")).toBeInTheDocument();
+    expect(screen.getByRole("search").nextElementSibling).toBe(launcher);
     fireEvent.click(launcher);
 
-    expect(await screen.findByRole("dialog", { name: "Daily Agent" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Daily Agent" })).toHaveAttribute("aria-modal", "true");
+    expect(document.body).toHaveClass("daily-agent-open");
     expect(await screen.findByText("test-model")).toBeInTheDocument();
-    expect(screen.getByText(/Writes always wait for confirmation/)).toBeInTheDocument();
+    expect(screen.getByText(/WRITES: CONFIRMATION REQUIRED/)).toBeInTheDocument();
     expect(screen.getByLabelText("Message Daily Agent")).toBeEnabled();
     expect(screen.getByRole("link", { name: "AGENT" })).toHaveAttribute("href", "/agent");
 
+    fireEvent.click(screen.getByRole("button", { name: "HELP" }));
+    expect(screen.getByRole("heading", { name: /daily-agent --help/ })).toBeInTheDocument();
+    expect(screen.getByText("get_today")).toBeInTheDocument();
+    expect(screen.getByText(/不能直接修改 Calendar/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /BACK/ }));
+    expect(screen.getByLabelText("Message Daily Agent")).toBeEnabled();
+
     fireEvent.keyDown(window, { key: "j", metaKey: true });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Daily Agent" })).not.toBeInTheDocument());
+    expect(document.body).not.toHaveClass("daily-agent-open");
   });
 
   it("configures the Daily Agent model and API key from its local settings view", async () => {

@@ -1,4 +1,4 @@
-import type { ApplicationSignal, AttemptStatus, CandidateProfile, DailyAgentDraft, DailyAgentMessage, DashboardSnapshot, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead, LifeTask, LifeTaskPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState, TripPlan, TripPlanPayload } from "./types";
+import type { ApplicationSignal, AttemptStatus, CandidateProfile, DailyAgentDraft, DailyAgentMessage, DailyAgentSession, DashboardSnapshot, GmailSignalConnection, JobApplication, JobApplicationPayload, JobLead, LifeTask, LifeTaskPayload, NeetCodeSnapshot, ProblemAttempt, ProblemWorkspace, TodoState, TripPlan, TripPlanPayload } from "./types";
 
 export type PiWebStatus = {
   online: boolean;
@@ -167,19 +167,57 @@ export async function testDailyAgentSettings(
   return response.json() as Promise<{ ok: true; model: string }>;
 }
 
-export async function loadDailyAgentHistory(): Promise<DailyAgentMessage[]> {
-  const response = await fetch("/api/v1/daily-agent/history", { cache: "no-store" });
+export async function loadDailyAgentSessions(): Promise<DailyAgentSession[]> {
+  const response = await fetch("/api/v1/daily-agent/sessions", { cache: "no-store" });
+  if (!response.ok) throw await apiError(response, "Daily Agent sessions API failed");
+  const payload = await response.json() as { sessions: DailyAgentSession[] };
+  return payload.sessions;
+}
+
+export async function createDailyAgentSession(title = "New chat"): Promise<DailyAgentSession> {
+  const response = await fetch("/api/v1/daily-agent/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw await apiError(response, "Daily Agent session create failed");
+  const payload = await response.json() as { session: DailyAgentSession };
+  return payload.session;
+}
+
+export async function renameDailyAgentSession(
+  sessionId: number,
+  title: string,
+): Promise<DailyAgentSession> {
+  const response = await fetch(`/api/v1/daily-agent/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw await apiError(response, "Daily Agent session rename failed");
+  const payload = await response.json() as { session: DailyAgentSession };
+  return payload.session;
+}
+
+export async function deleteDailyAgentSession(sessionId: number): Promise<void> {
+  const response = await fetch(`/api/v1/daily-agent/sessions/${sessionId}`, { method: "DELETE" });
+  if (!response.ok) throw await apiError(response, "Daily Agent session delete failed");
+}
+
+export async function loadDailyAgentHistory(sessionId: number): Promise<DailyAgentMessage[]> {
+  const response = await fetch(`/api/v1/daily-agent/sessions/${sessionId}/history`, { cache: "no-store" });
   if (!response.ok) throw await apiError(response, "Daily Agent history API failed");
   const payload = await response.json() as { messages: DailyAgentMessage[] };
   return payload.messages;
 }
 
-export async function clearDailyAgentHistory(): Promise<void> {
-  const response = await fetch("/api/v1/daily-agent/history", { method: "DELETE" });
+export async function clearDailyAgentHistory(sessionId: number): Promise<void> {
+  const response = await fetch(`/api/v1/daily-agent/sessions/${sessionId}/history`, { method: "DELETE" });
   if (!response.ok) throw await apiError(response, "Daily Agent history clear failed");
 }
 
 export async function streamDailyAgentMessage(
+  sessionId: number,
   message: string,
   signal: AbortSignal,
   onEvent: (event: DailyAgentStreamEvent) => void,
@@ -187,7 +225,7 @@ export async function streamDailyAgentMessage(
   const response = await fetch("/api/v1/daily-agent/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ session_id: sessionId, message }),
     signal,
   });
   if (!response.ok) throw await apiError(response, "Daily Agent request failed");

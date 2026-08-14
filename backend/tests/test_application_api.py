@@ -56,10 +56,19 @@ def test_application_crm_create_update_list_and_delete(tmp_path):
         assert updated.json()["application"]["stage"] == "recruiter_screen"
         assert updated.json()["application"]["contact_status"] == "replied"
 
+        regressed = request("PATCH", f"/api/v1/applications/{application_id}", {
+            "stage": "applied",
+            "next_step": "This must not overwrite the current next step",
+        })
+        assert regressed.status_code == 409
+        assert "cannot regress" in regressed.json()["detail"]
+
         listed = request("GET", "/api/v1/applications")
         assert listed.status_code == 200
         assert len(listed.json()["items"]) == 1
         assert listed.json()["items"][0]["company"] == "OpenAI"
+        assert listed.json()["items"][0]["stage"] == "recruiter_screen"
+        assert listed.json()["items"][0]["next_step"] == "Prepare the recruiter screen story"
 
         deleted = request("DELETE", f"/api/v1/applications/{application_id}")
         assert deleted.status_code == 204
