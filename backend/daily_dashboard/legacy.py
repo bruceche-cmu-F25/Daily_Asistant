@@ -1,4 +1,4 @@
-"""Read-only adapters for the legacy problem bank and progress database."""
+"""Read-only adapters for the problem bank and archived v1 progress database."""
 
 from __future__ import annotations
 
@@ -13,8 +13,17 @@ PROJECT_ROOT = Path(
     os.environ.get("DASHBOARD_HOME", Path(__file__).resolve().parents[2])
 )
 PROBLEM_BANK_PATH = PROJECT_ROOT / "data" / "problem_bank.json"
-LEGACY_DB_PATH = PROJECT_ROOT / "data" / "dashboard.db"
+LEGACY_DB_PATH = (
+    PROJECT_ROOT / "data" / "backups" / "legacy-dashboard-retired-20260717.db"
+)
 DASHBOARD_SNAPSHOT_PATH = PROJECT_ROOT / "data" / "dashboard_snapshot.json"
+
+
+def load_dashboard_snapshot(path: Path = DASHBOARD_SNAPSHOT_PATH) -> dict[str, Any]:
+    """Compatibility shim; the validated Snapshot Module owns this read now."""
+    from .snapshot import SnapshotStore
+
+    return SnapshotStore(path).load()
 
 
 def load_problem_bank(path: Path = PROBLEM_BANK_PATH) -> list[dict[str, Any]]:
@@ -23,34 +32,6 @@ def load_problem_bank(path: Path = PROBLEM_BANK_PATH) -> list[dict[str, Any]]:
     except (OSError, json.JSONDecodeError):
         return []
     return [item for item in payload if isinstance(item, dict)]
-
-
-def load_dashboard_snapshot(path: Path = DASHBOARD_SNAPSHOT_PATH) -> dict[str, Any]:
-    """Read the structured snapshot emitted by the unchanged daily generator."""
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {
-            "date": "",
-            "generated_at": "",
-            "weekly_plan": {"title": "Road Map", "url": ""},
-            "metrics": {"calendar_events": 0, "notion_tasks": 0, "fresh_jobs": 0},
-            "source_status": [],
-            "stale_sources": ["Calendar", "Notion", "Brave Search"],
-            "events": [],
-            "links": {"study": [], "jobs": []},
-            "weekly": [],
-            "notion": [],
-            "jobs": [],
-            "news": [],
-            "discover_events": [],
-            "job_groups": {},
-            "quick_actions": [],
-            "quiet_links": [],
-            "target_copy": "",
-            "target_copy_cn": "",
-        }
-    return payload if isinstance(payload, dict) else {}
 
 
 def load_legacy_progress(path: Path = LEGACY_DB_PATH) -> dict[str, dict[str, Any]]:

@@ -47,10 +47,9 @@ export function DiscoverPage({ dashboard }: Props) {
     <main className="discover-page">
       <section className="panel discover-hero">
         <div>
-          <p className="eyebrow">DISCOVER / READ-ONLY RADAR</p>
-          <h1>Events / 活动雷达</h1>
-          <p>只看 CMU Silicon Valley 周边和湾区活动。覆盖 South Bay、半岛与旧金山，再决定是否报名。</p>
-          <span className="discover-readonly">只读发现 · 不自动报名 · 不向外部平台回写</span>
+          <p className="eyebrow">READ ONLY · NO AUTO-REGISTRATION</p>
+          <h1>Bay Area Events</h1>
+          <p>CMU Silicon Valley, South Bay, the Peninsula, and San Francisco.</p>
         </div>
         <div className="discover-stats" aria-label="Discover summary">
           <div><b>{dashboard.events.length.toString().padStart(2, "0")}</b><span>today</span></div>
@@ -61,7 +60,7 @@ export function DiscoverPage({ dashboard }: Props) {
 
       <section className="panel discover-section today-events" aria-labelledby="today-events-title">
         <div className="discover-heading">
-          <div><p className="eyebrow">01 / YOUR CALENDAR</p><h2 id="today-events-title">Today / 今天已经安排</h2></div>
+          <div><h2 id="today-events-title">Today’s Calendar</h2></div>
           <span>{dashboard.date || "Waiting for sync"}</span>
         </div>
         <div className="today-event-grid">
@@ -77,7 +76,7 @@ export function DiscoverPage({ dashboard }: Props) {
 
       <section className="panel discover-section" aria-labelledby="event-radar-title">
         <div className="discover-heading radar-heading">
-          <div><p className="eyebrow">02 / OPPORTUNITY RADAR</p><h2 id="event-radar-title">近期活动候选</h2></div>
+          <div><h2 id="event-radar-title">Upcoming Events</h2></div>
           <div className="event-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search discovered events" placeholder="Search AI, startup, webinar…" /></div>
         </div>
         <div className="event-filters" role="group" aria-label="Event source filter">
@@ -99,7 +98,7 @@ export function DiscoverPage({ dashboard }: Props) {
       </section>
 
       <section className="panel discover-section" aria-labelledby="official-sources-title">
-        <div className="discover-heading"><div><p className="eyebrow">03 / OFFICIAL DOCK</p><h2 id="official-sources-title">官方活动入口</h2></div><span>稳定入口，不依赖搜索结果</span></div>
+        <div className="discover-heading"><div><h2 id="official-sources-title">Event Sources</h2></div><span>Luma and official event pages</span></div>
         <div className="official-source-grid">
           {officialSources.map((source) => (
             <a className={`official-source ${source.kind}`} href={source.url} key={source.url} target="_blank" rel="noopener noreferrer">
@@ -110,7 +109,7 @@ export function DiscoverPage({ dashboard }: Props) {
       </section>
 
       <section className="panel discover-section" aria-labelledby="tech-news-title">
-        <div className="discover-heading"><div><p className="eyebrow">04 / SIGNAL</p><h2 id="tech-news-title">Tech News / 科技信号</h2></div><span>只扫标题，需要时再打开</span></div>
+        <div className="discover-heading"><div><h2 id="tech-news-title">Tech News</h2></div><span>Headlines only</span></div>
         <ol className="discover-news">
           {dashboard.news.length ? dashboard.news.map((item, index) => (
             <li key={item.link}><span>{String(index + 1).padStart(2, "0")}</span><div><a href={item.link} target="_blank" rel="noopener noreferrer">{item.title}</a><p>{item.snippet}</p></div></li>

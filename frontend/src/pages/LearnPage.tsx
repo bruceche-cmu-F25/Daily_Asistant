@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { ModuleCustomizer } from "../components/ModuleCustomizer";
+import {
+  applyLayoutOperations,
+  normalizeLayoutConfig,
+  type LayoutOperation,
+  type ModuleLayoutConfig,
+} from "../modules/moduleConfig";
+import {
+  defaultLearningLayout,
+  learningComponentRegistry,
+  LEARNING_LAYOUT_STORAGE_KEY,
+} from "../modules/learningModule";
+
 type CourseId = "javascript" | "typescript";
 type LegacyCourseId = CourseId | "react";
 
@@ -76,6 +89,29 @@ const learningResourceGroups = [
     resources: [
       { mark: "FS", title: "Full Stack Open", provider: "University of Helsinki", description: "完整练习 React、REST API、测试、TypeScript 和 CI。", url: "https://fullstackopen.com/en/" },
       { mark: "PBL", title: "Project Based Learning", provider: "GitHub", description: "按语言挑选从零构建应用的教程，Python 和 JavaScript 都有。", url: "https://github.com/practical-tutorials/project-based-learning" },
+      { mark: "OW", title: "OpenWorker", provider: "Andrew Ng · GitHub", description: "研究本地优先、可接多模型与连接器的开源 AI coworker 架构。", url: "https://github.com/andrewyng/openworker" },
+      { mark: "OW", title: "OpenWork", provider: "different-ai · GitHub", description: "学习如何用桌面应用和 MCP 创建、复用并分享 AI 工作流。", url: "https://github.com/different-ai/openwork" },
+      { mark: "PF", title: "PocketFlow Codebase Knowledge", provider: "The Pocket · GitHub", description: "用 AI 分析代码库的核心抽象与关系，并生成适合初学者阅读的图文教程。", url: "https://github.com/the-pocket/pocketflow-tutorial-codebase-knowledge" },
+      { mark: "RW", title: "RepoWiki", provider: "he-yufeng · GitHub", description: "从本地目录或 GitHub 仓库生成可导出的 Wiki、阅读路线与终端问答。", url: "https://github.com/he-yufeng/RepoWiki" },
+      { mark: "AI", title: "Aider", provider: "Aider-AI · GitHub", description: "在终端中与多种 LLM 结对编程，理解代码库并结合 Git、测试和 lint 完成修改。", url: "https://github.com/Aider-AI/aider" },
+      { mark: "PI", title: "Pi Web", provider: "agegr · GitHub · MIT", description: "为 pi coding agent 提供本地 Web UI，可浏览会话、实时聊天、配置模型和技能，并预览项目文件。", url: "https://github.com/agegr/pi-web" },
+    ],
+  },
+  {
+    eyebrow: "DESIGN & MOTION",
+    title: "Frontend design ideas",
+    description: "网页布局、极简视觉、品牌系统、演示文稿与高性能交互动效参考。",
+    resources: [
+      { mark: "NO", title: "Noiced", provider: "Web design", description: "Daily web design inspiration across studios, products, and portfolios.", url: "https://noiced.com/" },
+      { mark: "MN", title: "Minimum", provider: "Minimal", description: "A focused directory of minimal websites where less is more.", url: "https://mnmm.xyz/" },
+      { mark: "DG", title: "Deck Gallery", provider: "Presentation", description: "Curated decks and slides for pitch, report, portfolio, and brand-system ideas.", url: "https://deck.gallery/" },
+      { mark: "RE", title: "Recent", provider: "Design trends", description: "Fresh references across web interfaces, branding, typography, motion, and 3D.", url: "https://recent.design/" },
+      { mark: "LS", title: "Logosystem", provider: "Branding", description: "A searchable library of logos, wordmarks, symbols, and animated identities.", url: "https://logosystem.co/" },
+      { mark: "WI", title: "Wild — Craft, Engineered", provider: "Creative tech", description: "Award-winning websites, apps, interactions, and creative technology case studies.", url: "https://craft.wild.as/" },
+      { mark: "RB", title: "React Bits — Dither", provider: "React effect", description: "A customizable animated dither background component for React interfaces.", url: "https://reactbits.dev/backgrounds/dither" },
+      { mark: "CU", title: "Canvas UI", provider: "Canvas UI", description: "Creative HTML-in-canvas components for interactive effects and visual experiments.", url: "https://canvasui.dev/components" },
+      { mark: "GS", title: "GSAP", provider: "Animation", description: "A framework-agnostic JavaScript library for high-performance web animation.", url: "https://github.com/greensock/gsap" },
+      { mark: "US", title: "Unicorn Studio Inspiration", provider: "WebGL motion", description: "Interactive WebGL motion ideas and no-code effects for modern websites.", url: "https://www.unicorn.studio/inspiration" },
     ],
   },
 ] as const;
@@ -146,6 +182,29 @@ const projectLadder = [
 const emptyProjectProgress: ProjectProgress = { slice: [], backend: [], quality: [] };
 const projectRepoUrl = "https://github.com/bruceche-cmu-F25/Daily_Asistant/tree/codex/react-fastapi-refactor";
 
+const specialProjectChannels = [
+  {
+    mark: "PBL",
+    mode: "GUIDED BUILD",
+    title: "Project Based Learning",
+    description: "跟着完整教程从零交付一个应用。适合第一次接触某类项目，重点是完成端到端流程。",
+    recommendation: "推荐入口：Python Web Applications",
+    outcome: "完成后必须改一个核心需求，避免只复制教程。",
+    cta: "ENTER GUIDED CHANNEL",
+    url: "https://github.com/practical-tutorials/project-based-learning#python",
+  },
+  {
+    mark: "BYOX",
+    mode: "BUILD FROM SCRATCH",
+    title: "Build Your Own X",
+    description: "重造 Git、数据库、Web Server、Redis 等真实技术。适合训练底层原理、设计取舍和代码深度。",
+    recommendation: "推荐起点：Web Server → Git → Database",
+    outcome: "完成后写架构图、限制和你做过的取舍。",
+    cta: "ENTER FROM-SCRATCH CHANNEL",
+    url: "https://github.com/codecrafters-io/build-your-own-x",
+  },
+] as const;
+
 function localDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -197,6 +256,16 @@ function readProjectProgress(): ProjectProgress {
   }
 }
 
+function readLearningLayout(): ModuleLayoutConfig {
+  try {
+    const raw = learningStorage()?.getItem(LEARNING_LAYOUT_STORAGE_KEY);
+    const saved = raw ? JSON.parse(raw) as Partial<ModuleLayoutConfig> : null;
+    return normalizeLayoutConfig(saved, learningComponentRegistry);
+  } catch {
+    return defaultLearningLayout;
+  }
+}
+
 function learningStreak(progress: LearningProgress, today: string) {
   const studied = new Set([...progress.javascript.sessions, ...progress.typescript.sessions]);
   const cursor = new Date(`${today}T12:00:00`);
@@ -213,6 +282,8 @@ export function LearnPage() {
   const [progress, setProgress] = useState<LearningProgress>(readProgress);
   const [activeProjectId, setActiveProjectId] = useState<ProjectId>("slice");
   const [projectProgress, setProjectProgress] = useState<ProjectProgress>(readProjectProgress);
+  const [layout, setLayout] = useState<ModuleLayoutConfig>(readLearningLayout);
+  const [layoutHistory, setLayoutHistory] = useState<ModuleLayoutConfig[]>([]);
   const today = localDate();
   const activeCourse = courses[activeId];
   const doneToday = progress[activeId].sessions.includes(today);
@@ -228,6 +299,10 @@ export function LearnPage() {
   useEffect(() => {
     learningStorage()?.setItem(PROJECT_GYM_STORAGE_KEY, JSON.stringify(projectProgress));
   }, [projectProgress]);
+
+  useEffect(() => {
+    learningStorage()?.setItem(LEARNING_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+  }, [layout]);
 
   const toggleToday = () => {
     setProgress((current) => {
@@ -252,26 +327,49 @@ export function LearnPage() {
     });
   };
 
+  const applyLayout = (operations: LayoutOperation[]) => {
+    setLayoutHistory((current) => [...current, layout].slice(-20));
+    setLayout((current) => applyLayoutOperations(current, operations));
+  };
+
+  const undoLayout = () => {
+    const previous = layoutHistory.at(-1);
+    if (!previous) return;
+    setLayout(previous);
+    setLayoutHistory((current) => current.slice(0, -1));
+  };
+
+  const componentOrder = (id: string) => layout.order.indexOf(id);
+  const componentIsVisible = (id: string) => !layout.hidden.includes(id);
+
   return (
     <main className="learn-page">
-      <section className="panel learn-hero">
+      <ModuleCustomizer
+        moduleTitle="Learning Hub"
+        components={learningComponentRegistry}
+        config={layout}
+        canUndo={layoutHistory.length > 0}
+        onApply={applyLayout}
+        onUndo={undoLayout}
+      />
+
+      {componentIsVisible("overview") && <section className="panel learn-hero" data-component-id="overview" style={{ order: componentOrder("overview") }}>
         <div>
-          <p className="eyebrow">LEARN / BUILD / PROVE</p>
-          <h1>Learning<br /><span>Lab</span></h1>
-          <p>先完成 freeCodeCamp JavaScript V9，再进入 Front End Development Libraries。Python 不再只练语法，而是通过 Daily Assistant 练完整项目交付。</p>
-          <span className="learn-local">本机只保存完成次数</span>
+          <p className="eyebrow">LOCAL PROGRESS ONLY</p>
+          <h1>Learning<br /><span>Hub</span></h1>
+          <p>Start with freeCodeCamp JavaScript, then build project-level Python in Daily Assistant.</p>
         </div>
         <div className="learn-stats" aria-label="Learning summary">
           <div><b>{sessionsToday.toString().padStart(2, "0")}</b><span>sessions today</span></div>
           <div><b>{streak.toString().padStart(2, "0")}</b><span>day streak</span></div>
           <div><b>{totalSessions.toString().padStart(2, "0")}</b><span>total sessions</span></div>
         </div>
-      </section>
+      </section>}
 
-      <section className="panel learn-section" aria-labelledby="learning-tracks-title">
+      {componentIsVisible("today") && <section className="panel learn-section" aria-labelledby="learning-tracks-title" data-component-id="today" style={{ order: componentOrder("today") }}>
         <div className="learn-heading">
-          <div><p className="eyebrow">01 / CHOOSE A TRACK</p><h2 id="learning-tracks-title">Today / 今天学哪个</h2></div>
-          <span>一次只推进一门课</span>
+          <div><h2 id="learning-tracks-title">What to Learn Today</h2></div>
+          <span>One course at a time</span>
         </div>
         <div className="learning-track-grid">
           {(Object.keys(courses) as CourseId[]).map((id) => {
@@ -286,11 +384,11 @@ export function LearnPage() {
             );
           })}
         </div>
-      </section>
+      </section>}
 
-      <section className="panel learn-section learning-workspace" aria-labelledby="learning-workspace-title">
+      {componentIsVisible("course-workspace") && <section className="panel learn-section learning-workspace" aria-labelledby="learning-workspace-title" data-component-id="course-workspace" style={{ order: componentOrder("course-workspace") }}>
         <div className="learn-heading">
-          <div><p className="eyebrow">02 / WATCH + CODE</p><h2 id="learning-workspace-title">{activeCourse.title}</h2></div>
+          <div><h2 id="learning-workspace-title">{activeCourse.title}</h2></div>
           <span>{activeCourse.provider}</span>
         </div>
         <div className="learning-workspace-grid">
@@ -304,10 +402,10 @@ export function LearnPage() {
             />
           </div>
           <aside className="learning-session-card">
-            <p className="eyebrow">TODAY'S LOOP</p>
+            <p className="eyebrow">TODAY’S SESSION</p>
             <ol>
-              <li><b>WATCH</b><span>只推进一个清楚的小节。</span></li>
-              <li><b>CODE</b><span>关掉视频，自己重新写一遍。</span></li>
+              <li><b>WATCH</b><span>Finish one focused section.</span></li>
+              <li><b>CODE</b><span>Close the video and rebuild it yourself.</span></li>
               <li><b>PROVE</b><span>{activeCourse.proof}</span></li>
             </ol>
             <button className={doneToday ? "done" : ""} type="button" onClick={toggleToday}>{doneToday ? "✓ DONE TODAY / 已完成" : "MARK TODAY DONE / 完成今天"}</button>
@@ -318,12 +416,12 @@ export function LearnPage() {
           <a href={activeCourse.secondaryUrl} target="_blank" rel="noopener noreferrer">{activeCourse.secondaryLabel} ↗</a>
           {activeId === "javascript" && <p>freeCodeCamp 挑战站禁止第三方 iframe；上方视频用于讲解，真正的主线练习从 JavaScript V9 原站进入。</p>}
         </div>
-      </section>
+      </section>}
 
-      <section className="panel learn-section learning-library" aria-labelledby="learning-library-title">
+      {componentIsVisible("resource-library") && <section className="panel learn-section learning-library" aria-labelledby="learning-library-title" data-component-id="resource-library" style={{ order: componentOrder("resource-library") }}>
         <div className="learn-heading">
-          <div><p className="eyebrow">03 / COURSE + REFERENCE LIBRARY</p><h2 id="learning-library-title">Learning links / 学习入口</h2></div>
-          <span>按顺序学，不需要同时打开</span>
+          <div><h2 id="learning-library-title">Courses & References</h2></div>
+          <span>Follow one path at a time</span>
         </div>
         <div className="learning-resource-groups">
           {learningResourceGroups.map((group) => (
@@ -341,14 +439,14 @@ export function LearnPage() {
             </section>
           ))}
         </div>
-      </section>
+      </section>}
 
-      <section className="panel learn-section project-gym" aria-labelledby="project-gym-title">
+      {componentIsVisible("project-gym") && <section className="panel learn-section project-gym" aria-labelledby="project-gym-title" data-component-id="project-gym" style={{ order: componentOrder("project-gym") }}>
         <div className="learn-heading">
-          <div><p className="eyebrow">04 / PROJECT-LEVEL PRACTICE</p><h2 id="project-gym-title">Python project gym / 项目级训练</h2></div>
-          <span>主训练场：Daily Assistant</span>
+          <div><h2 id="project-gym-title">Project-Level Python</h2></div>
+          <span>Main workspace: Daily Assistant</span>
         </div>
-        <p className="project-gym-intro">不要再造三个只能展示首页的 toy project。每周在这个代码库交付一个完整切片，同时练 Python 设计、数据库、测试、前端集成和 Git。</p>
+        <p className="project-gym-intro">Ship one complete Daily Assistant slice each week: design, database, tests, frontend integration, and Git.</p>
         <div className="project-ladder">
           {projectLadder.map((item) => (
             <button className={activeProjectId === item.id ? "active" : ""} type="button" aria-pressed={activeProjectId === item.id} onClick={() => setActiveProjectId(item.id)} key={item.step}>
@@ -378,25 +476,41 @@ export function LearnPage() {
               <p>CODE + REFERENCES</p>
               <a href={projectRepoUrl} target="_blank" rel="noopener noreferrer">OPEN PROJECT REPO ↗</a>
               {activeProject.links.map((link) => <a href={link.url} target="_blank" rel="noopener noreferrer" key={link.url}>{link.label} ↗</a>)}
-              <span>完成状态只保存在这台 Mac。先完成 01，再进入 02 和 03。</span>
+              <span>Progress stays on this Mac. Complete 01 before 02 and 03.</span>
             </aside>
           </div>
         </section>
         <div className="project-definition">
           <b>PROJECT DEFINITION OF DONE</b>
-          <span>清晰目录</span><span>类型和验证</span><span>pytest</span><span>错误处理</span><span>README</span><span>CI 通过</span><span>可演示结果</span>
+          <span>Clear structure</span><span>Types & validation</span><span>pytest</span><span>Error handling</span><span>README</span><span>Passing CI</span><span>Demo-ready result</span>
         </div>
-      </section>
+        <section className="special-project-channel" aria-labelledby="special-project-channel-title">
+          <header>
+            <div><h3 id="special-project-channel-title">Project Challenges (Optional)</h3></div>
+            <span>Choose one after completing a core mission.</span>
+          </header>
+          <div className="special-channel-grid">
+            {specialProjectChannels.map((channel) => (
+              <a href={channel.url} target="_blank" rel="noopener noreferrer" key={channel.url}>
+                <span>{channel.mark}</span>
+                <div><small>{channel.mode}</small><h4>{channel.title}</h4><p>{channel.description}</p><b>{channel.recommendation}</b><em>{channel.outcome}</em></div>
+                <strong>{channel.cta} ↗</strong>
+              </a>
+            ))}
+          </div>
+          <footer><b>CHANNEL RULE</b><span>One project at a time</span><span>Use a dedicated repo</span><span>Ship a working result weekly</span><span>Finish with a README and demo</span></footer>
+        </section>
+      </section>}
 
-      <section className="panel learn-section career-loop" aria-labelledby="career-loop-title">
-        <div className="learn-heading"><div><p className="eyebrow">05 / TURN LEARNING INTO SIGNAL</p><h2 id="career-loop-title">Job-ready loop / 让学习帮助求职</h2></div></div>
+      {componentIsVisible("career-loop") && <section className="panel learn-section career-loop" aria-labelledby="career-loop-title" data-component-id="career-loop" style={{ order: componentOrder("career-loop") }}>
+        <div className="learn-heading"><div><h2 id="career-loop-title">From Learning to Hiring</h2></div></div>
         <div className="career-loop-grid">
           <article><span>01</span><b>Learn</b><p>每天只学一个可复述的概念。</p></article>
           <article><span>02</span><b>Build</b><p>当天放进 Daily Assistant 或 portfolio。</p></article>
           <article><span>03</span><b>Ship</b><p>留下 commit、截图或可访问页面。</p></article>
           <article><span>04</span><b>Explain</b><p>准备两句话说明取舍、bug 和结果。</p></article>
         </div>
-      </section>
+      </section>}
     </main>
   );
 }

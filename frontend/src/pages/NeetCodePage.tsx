@@ -85,12 +85,11 @@ function TopicRoadmap({
     <section className="panel section-block roadmap" aria-label="NeetCode 150 topic graph">
       <div className="roadmap-head">
         <div>
-          <p className="eyebrow">NEETCODE 150 / ALL PROBLEMS</p>
-          <h2>Roadmap / 路线图</h2>
+          <h2>NeetCode 150 Roadmap</h2>
         </div>
         <div className="roadmap-total"><b>{snapshot.summary.completed}</b><span>/ {snapshot.summary.total} complete</span></div>
       </div>
-      <p className="roadmap-copy">按 NeetCode 的依赖顺序浏览 Topic。点击节点查看完整题单，也可以从任意旧题开始新的 attempt。</p>
+      <p className="roadmap-copy">Open a topic to view its list or retry a problem.</p>
       <div className="roadmap-scroll">
         <div className="roadmap-canvas">
           <svg className="roadmap-edges" viewBox="0 0 1060 850" aria-hidden="true">
@@ -167,9 +166,8 @@ function ProblemHistory({ snapshot }: { snapshot: NeetCodeSnapshot }) {
     <section className="panel section-block problem-history" id="history" aria-label="Problem history">
       <div className="history-head">
         <div>
-          <p className="eyebrow">LOCAL PROBLEM DATABASE</p>
-          <h2>History / 刷题记录</h2>
-          <p>按 Topic 看 NeetCode 150 进度；每道题会保留所有 attempts、Python solution 和心得。</p>
+          <h2>Problem History</h2>
+          <p>Review progress, solutions, and notes by topic.</p>
         </div>
         <div className="history-stats" aria-label="Problem history summary">
           <div><b>{snapshot.summary.completed}</b><span>completed</span></div>
@@ -333,14 +331,13 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
       <section className="panel coach-block problem-coach" id="problem-workspace" aria-label="Problem coach">
         <div className="problem-coach-head">
           <div>
-            <p className="eyebrow">PROBLEM COACH</p>
-            <h1>Do Now / 现在刷这题</h1>
-            <p>一次只做一道 NeetCode 150。做完以后再记录 solution 和心得，全部只保存在这台 Mac。</p>
+            <h1>Do Now</h1>
+            <p>One problem at a time. A solution is required; notes are optional.</p>
           </div>
           <div className="coach-today"><b>{todaySolved}</b><span>problems today</span></div>
         </div>
         <div className="time-budget" role="group" aria-label="Available problem-solving time">
-          <span>我现在有</span>
+          <span>TIME AVAILABLE</span>
           {[15, 30, 45, 60].map((minutes) => (
             <button
               className={budget === minutes ? "active" : ""}
@@ -412,7 +409,7 @@ export function NeetCodePage({ snapshot, onRefresh }: Props) {
         <div className="completion-backdrop">
           <section className="completion-dialog" role="dialog" aria-modal="true" aria-labelledby="completion-dialog-title">
             <div className="completion-dialog-head">
-              <div><p className="eyebrow">COMPLETE ATTEMPT</p><h2 id="completion-dialog-title">保存刷题记录</h2></div>
+              <div><h2 id="completion-dialog-title">Save Attempt</h2></div>
               <button type="button" aria-label="关闭保存窗口" onClick={() => setCompletionOpen(false)}>×</button>
             </div>
             <p className="completion-problem">{activeProblem.title} · {activeProblem.topic} · {saveState}</p>

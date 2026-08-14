@@ -2,11 +2,12 @@ import type { ReactNode } from "react";
 
 const brandRules: Array<[string, string, string]> = [
   ["linkedin.com", "linkedin", "in"], ["github.com", "github", "GH"],
-  ["youtube.com", "youtube", "YT"], ["leetcode.com", "leetcode", "LC"],
+  ["youtube.com", "youtube", "YT"], ["youtu.be", "youtube", "YT"], ["leetcode.com", "leetcode", "LC"],
   ["neetcode.io", "neetcode", "NC"], ["freecodecamp.org", "freecodecamp", "fC"],
   ["notion.so", "notion", "N"], ["jobright.ai", "jobright", "JR"],
   ["simplify.jobs", "simplify", "S"], ["mail.google.com", "gmail", "M"],
   ["joinhandshake.com", "handshake", "H"], ["google.com", "google", "G"],
+  ["careers.google.com", "google", "G"], ["lnkd.in", "linkedin", "in"],
 ];
 
 export function brandIdentity(url: string) {

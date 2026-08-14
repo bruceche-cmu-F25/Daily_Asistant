@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
-from collections.abc import Generator
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -11,20 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .database import make_engine
+from .infra import get_session, now_iso
 from .models import ProblemAttempt, ProblemDraft
 
 
 router = APIRouter(prefix="/api/v1", tags=["attempts"])
-
-
-def now_iso() -> str:
-    return dt.datetime.now().astimezone().isoformat(timespec="seconds")
-
-
-def get_session() -> Generator[Session, None, None]:
-    with Session(make_engine()) as session:
-        yield session
 
 
 class DraftPayload(BaseModel):
